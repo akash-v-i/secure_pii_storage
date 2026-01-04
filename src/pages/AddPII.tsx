@@ -9,12 +9,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
+const PII_TYPES = [
+  { value: 'ssn', label: 'Social Security Number' },
+  { value: 'passport', label: 'Passport Number' },
+  { value: 'drivers_license', label: "Driver's License" },
+  { value: 'credit_card', label: 'Credit Card Number' },
+  { value: 'bank_account', label: 'Bank Account Number' },
+  { value: 'medical_id', label: 'Medical ID' },
+  { value: 'tax_id', label: 'Tax ID Number' },
+  { value: 'other', label: 'Other Sensitive Data' },
+] as const;
+
 const piiSchema = z.object({
-  fullName: z.string().min(2, 'Full name must be at least 2 characters').max(100),
-  email: z.string().email('Please enter a valid email address').max(255),
-  phone: z.string().regex(/^\+?[\d\s\-()]{10,}$/, 'Please enter a valid phone number'),
+  piiType: z.string().min(1, 'Please select a PII type'),
+  piiValue: z.string().min(1, 'PII value is required').max(500, 'Value must be less than 500 characters'),
+  label: z.string().min(2, 'Label must be at least 2 characters').max(100, 'Label must be less than 100 characters'),
+  notes: z.string().max(500, 'Notes must be less than 500 characters').optional(),
   expiryDate: z.string().optional(),
 });
 
@@ -26,22 +40,48 @@ export const AddPII: React.FC = () => {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
     reset,
   } = useForm<PIIFormData>({
     resolver: zodResolver(piiSchema),
+    defaultValues: {
+      piiType: '',
+      piiValue: '',
+      label: '',
+      notes: '',
+      expiryDate: '',
+    },
   });
+
+  const selectedType = watch('piiType');
 
   const onSubmit = async (data: PIIFormData) => {
     // Simulate encryption and storage
     await new Promise(resolve => setTimeout(resolve, 1500));
     
+    const piiLabel = PII_TYPES.find(t => t.value === data.piiType)?.label || data.piiType;
+    
     toast.success('PII Record Encrypted & Stored', {
-      description: 'Your personal information has been securely encrypted and saved.',
+      description: `Your ${piiLabel} has been securely encrypted and saved.`,
     });
     
     reset();
     navigate('/vault');
+  };
+
+  const getPlaceholderForType = (type: string): string => {
+    switch (type) {
+      case 'ssn': return '***-**-****';
+      case 'passport': return 'Passport number';
+      case 'drivers_license': return 'License number';
+      case 'credit_card': return '**** **** **** ****';
+      case 'bank_account': return 'Account number';
+      case 'medical_id': return 'Medical ID number';
+      case 'tax_id': return 'Tax ID number';
+      default: return 'Enter sensitive data';
+    }
   };
 
   return (
@@ -78,50 +118,76 @@ export const AddPII: React.FC = () => {
               Personal Information
             </CardTitle>
             <CardDescription>
-              Enter the details you want to encrypt and store securely
+              Select the type of data and enter the sensitive information to encrypt
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name *</Label>
-                <Input
-                  id="fullName"
-                  placeholder="John Alexander Smith"
-                  {...register('fullName')}
-                  className={errors.fullName ? 'border-destructive' : ''}
-                />
-                {errors.fullName && (
-                  <p className="text-sm text-destructive">{errors.fullName.message}</p>
+                <Label htmlFor="piiType">PII Type *</Label>
+                <Select 
+                  value={selectedType}
+                  onValueChange={(value) => setValue('piiType', value, { shouldValidate: true })}
+                >
+                  <SelectTrigger className={errors.piiType ? 'border-destructive' : ''}>
+                    <SelectValue placeholder="Select the type of data" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PII_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.piiType && (
+                  <p className="text-sm text-destructive">{errors.piiType.message}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="john.smith@example.com"
-                  {...register('email')}
-                  className={errors.email ? 'border-destructive' : ''}
+                <Label htmlFor="piiValue">Sensitive Value *</Label>
+                <Textarea
+                  id="piiValue"
+                  placeholder={getPlaceholderForType(selectedType)}
+                  {...register('piiValue')}
+                  className={`font-mono ${errors.piiValue ? 'border-destructive' : ''}`}
+                  rows={3}
                 />
-                {errors.email && (
-                  <p className="text-sm text-destructive">{errors.email.message}</p>
+                {errors.piiValue && (
+                  <p className="text-sm text-destructive">{errors.piiValue.message}</p>
                 )}
+                <p className="text-xs text-muted-foreground">
+                  Enter the actual sensitive data you want to encrypt
+                </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number *</Label>
+                <Label htmlFor="label">Label / Description *</Label>
                 <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+1 (555) 123-4567"
-                  {...register('phone')}
-                  className={errors.phone ? 'border-destructive' : ''}
+                  id="label"
+                  placeholder="e.g., Personal SSN, Work Passport, Bank of America Checking"
+                  {...register('label')}
+                  className={errors.label ? 'border-destructive' : ''}
                 />
-                {errors.phone && (
-                  <p className="text-sm text-destructive">{errors.phone.message}</p>
+                {errors.label && (
+                  <p className="text-sm text-destructive">{errors.label.message}</p>
                 )}
+                <p className="text-xs text-muted-foreground">
+                  A friendly name to help you identify this record
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">
+                  Notes <span className="text-muted-foreground">(Optional)</span>
+                </Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Any additional notes about this data..."
+                  {...register('notes')}
+                  rows={2}
+                />
               </div>
 
               <div className="space-y-2">

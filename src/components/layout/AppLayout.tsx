@@ -11,10 +11,10 @@ export const AppLayout: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen overflow-hidden bg-background">
       <AppSidebar />
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">
+      <main className="flex-1 overflow-y-auto">
+        <div className="p-8 min-h-full">
           <Outlet />
         </div>
       </main>

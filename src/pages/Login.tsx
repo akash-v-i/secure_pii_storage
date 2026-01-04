@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { Shield, Lock, User, RefreshCw, AlertCircle } from 'lucide-react';
+import { Shield, Lock, User, RefreshCw, AlertCircle, Mail } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,11 +11,36 @@ export const Login: React.FC = () => {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [captcha, setCaptcha] = useState('');
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password: string): boolean => {
+    return password.length >= 6;
+  };
+
+  const validateForm = (): boolean => {
+    const errors: { email?: string; password?: string } = {};
+    
+    if (!validateEmail(email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    
+    if (!validatePassword(password)) {
+      errors.password = 'Password must be at least 6 characters';
+    }
+    
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
@@ -24,10 +49,16 @@ export const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
+
+    if (!validateForm()) {
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const success = await login(username, password, captcha);
+      const success = await login(email, password, captcha);
       if (success) {
         navigate('/dashboard');
       } else {
@@ -105,19 +136,22 @@ export const Login: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="email">Email</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    id="username"
-                    type="text"
-                    placeholder="Enter username"
-                    className="pl-10"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="email"
+                    type="email"
+                    placeholder="Enter email"
+                    className={`pl-10 ${fieldErrors.email ? 'border-destructive' : ''}`}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
                   />
                 </div>
+                {fieldErrors.email && (
+                  <p className="text-sm text-destructive">{fieldErrors.email}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -127,13 +161,16 @@ export const Login: React.FC = () => {
                   <Input
                     id="password"
                     type="password"
-                    placeholder="Enter password"
-                    className="pl-10"
+                    placeholder="Enter password (min 6 chars)"
+                    className={`pl-10 ${fieldErrors.password ? 'border-destructive' : ''}`}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
                 </div>
+                {fieldErrors.password && (
+                  <p className="text-sm text-destructive">{fieldErrors.password}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -178,9 +215,9 @@ export const Login: React.FC = () => {
 
             <div className="mt-6 pt-6 border-t border-border">
               <p className="text-xs text-muted-foreground text-center">
-                Demo credentials: <span className="font-mono">admin/admin123</span>, 
-                <span className="font-mono"> user/user123</span>, or 
-                <span className="font-mono"> auditor/auditor123</span>
+                Demo: <span className="font-mono">admin@vault.com/admin123</span>, 
+                <span className="font-mono"> user@vault.com/user123</span>, or 
+                <span className="font-mono"> auditor@vault.com/auditor123</span>
               </p>
             </div>
           </div>
