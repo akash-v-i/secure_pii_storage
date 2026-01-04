@@ -17,12 +17,13 @@ const initialRecords: PIIRecord[] = [
   { id: '3', type: 'passport', typeLabel: 'Passport Number', value: 'AB1234567', label: 'US Passport', lastAccessed: '2024-01-10 11:00', expiryDate: '2024-12-31' },
 ];
 
-// In-memory store
-let piiRecords: PIIRecord[] = [...initialRecords];
+// In-memory store - keep a stable reference
+let piiRecords: PIIRecord[] = initialRecords;
 let listeners: Set<() => void> = new Set();
 
 export const piiStore = {
-  getRecords: (): PIIRecord[] => [...piiRecords],
+  // Return the same array reference (stable for useSyncExternalStore)
+  getRecords: (): PIIRecord[] => piiRecords,
   
   addRecord: (record: Omit<PIIRecord, 'id' | 'lastAccessed'>): PIIRecord => {
     const newRecord: PIIRecord = {
@@ -30,12 +31,14 @@ export const piiStore = {
       id: Date.now().toString(),
       lastAccessed: new Date().toISOString().replace('T', ' ').slice(0, 16),
     };
+    // Create new array reference only when data changes
     piiRecords = [...piiRecords, newRecord];
     listeners.forEach(listener => listener());
     return newRecord;
   },
   
   deleteRecord: (id: string): void => {
+    // Create new array reference only when data changes
     piiRecords = piiRecords.filter(r => r.id !== id);
     listeners.forEach(listener => listener());
   },
