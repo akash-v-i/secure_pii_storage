@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useSyncExternalStore } from 'react';
+import React, { useState, useSyncExternalStore } from 'react';
 import { Lock, Plus, Trash2, Search, Filter } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { SecureValueCell } from '@/components/common/SecureValueCell';
@@ -30,7 +30,7 @@ import { piiStore, PIIRecord } from '@/stores/piiStore';
 
 export const Vault: React.FC = () => {
   const navigate = useNavigate();
-  const records = useSyncExternalStore(piiStore.subscribe, piiStore.getRecords);
+  const records = useSyncExternalStore(piiStore.subscribe, piiStore.getRecords, piiStore.getRecords);
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredRecords = records.filter(record =>
