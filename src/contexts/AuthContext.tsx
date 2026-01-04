@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { User, UserRole, AuthState } from '@/types/auth';
 
 interface AuthContextType extends AuthState {
-  login: (username: string, password: string, captcha: string) => Promise<boolean>;
+  login: (email: string, password: string, captcha: string) => Promise<boolean>;
   logout: () => void;
   hasRole: (roles: UserRole[]) => boolean;
 }
@@ -10,10 +10,10 @@ interface AuthContextType extends AuthState {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Mock user data for demonstration
-const mockUsers: Record<string, { password: string; role: UserRole }> = {
-  'admin': { password: 'admin123', role: 'admin' },
-  'user': { password: 'user123', role: 'user' },
-  'auditor': { password: 'auditor123', role: 'auditor' },
+const mockUsers: Record<string, { password: string; role: UserRole; name: string }> = {
+  'admin@vault.com': { password: 'admin123', role: 'admin', name: 'Admin User' },
+  'user@vault.com': { password: 'user123', role: 'user', name: 'Demo User' },
+  'auditor@vault.com': { password: 'auditor123', role: 'auditor', name: 'Auditor User' },
 };
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -22,7 +22,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     isAuthenticated: false,
   });
 
-  const login = async (username: string, password: string, captcha: string): Promise<boolean> => {
+  const login = async (email: string, password: string, captcha: string): Promise<boolean> => {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 800));
     
@@ -31,12 +31,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return false;
     }
     
-    const mockUser = mockUsers[username.toLowerCase()];
+    const mockUser = mockUsers[email.toLowerCase()];
     if (mockUser && mockUser.password === password) {
       setAuthState({
         user: {
           id: crypto.randomUUID(),
-          username,
+          username: mockUser.name,
+          email: email.toLowerCase(),
           role: mockUser.role,
           lastLogin: new Date(),
         },
