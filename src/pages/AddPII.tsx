@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { piiStore } from '@/stores/piiStore';
 
 const PII_TYPES = [
   { value: 'ssn', label: 'Social Security Number' },
@@ -61,7 +62,18 @@ export const AddPII: React.FC = () => {
     // Simulate encryption and storage
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    const piiLabel = PII_TYPES.find(t => t.value === data.piiType)?.label || data.piiType;
+    const piiTypeInfo = PII_TYPES.find(t => t.value === data.piiType);
+    const piiLabel = piiTypeInfo?.label || data.piiType;
+    
+    // Add to the shared store
+    piiStore.addRecord({
+      type: data.piiType,
+      typeLabel: piiLabel,
+      value: data.piiValue,
+      label: data.label,
+      notes: data.notes,
+      expiryDate: data.expiryDate || undefined,
+    });
     
     toast.success('PII Record Encrypted & Stored', {
       description: `Your ${piiLabel} has been securely encrypted and saved.`,

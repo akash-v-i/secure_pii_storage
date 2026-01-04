@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import { Lock, Plus, Trash2, Search, Filter } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { SecureValueCell } from '@/components/common/SecureValueCell';
@@ -26,35 +26,20 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-
-interface PIIRecord {
-  id: string;
-  type: string;
-  value: string;
-  lastAccessed: string;
-  expiryDate?: string;
-}
-
-const mockPIIData: PIIRecord[] = [
-  { id: '1', type: 'Full Name', value: 'John Alexander Smith', lastAccessed: '2024-01-15 14:30', expiryDate: '2025-01-15' },
-  { id: '2', type: 'Email Address', value: 'john.smith@email.com', lastAccessed: '2024-01-15 14:25' },
-  { id: '3', type: 'Phone Number', value: '+1 (555) 123-4567', lastAccessed: '2024-01-14 09:15', expiryDate: '2024-06-01' },
-  { id: '4', type: 'SSN', value: '***-**-4567', lastAccessed: '2024-01-10 11:00' },
-  { id: '5', type: 'Credit Card', value: '**** **** **** 1234', lastAccessed: '2024-01-08 16:45', expiryDate: '2024-12-31' },
-  { id: '6', type: 'Address', value: '123 Main St, New York, NY 10001', lastAccessed: '2024-01-05 10:30' },
-];
+import { piiStore, PIIRecord } from '@/stores/piiStore';
 
 export const Vault: React.FC = () => {
   const navigate = useNavigate();
-  const [records, setRecords] = useState<PIIRecord[]>(mockPIIData);
+  const records = useSyncExternalStore(piiStore.subscribe, piiStore.getRecords);
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredRecords = records.filter(record =>
-    record.type.toLowerCase().includes(searchQuery.toLowerCase())
+    record.typeLabel.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    record.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleDelete = (id: string) => {
-    setRecords(records.filter(r => r.id !== id));
+    piiStore.deleteRecord(id);
     toast.success('PII record deleted successfully', {
       description: 'The encrypted data has been permanently removed.',
     });
@@ -135,17 +120,18 @@ export const Vault: React.FC = () => {
             {filteredRecords.map((record) => (
               <TableRow key={record.id} className="hover:bg-muted/30">
                 <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="font-medium">
-                      {record.type}
+                  <div className="flex flex-col gap-1">
+                    <Badge variant="secondary" className="font-medium w-fit">
+                      {record.typeLabel}
                     </Badge>
+                    <span className="text-xs text-muted-foreground">{record.label}</span>
                   </div>
                 </TableCell>
                 <TableCell>
                   <SecureValueCell
                     value={record.value}
                     revealDuration={5}
-                    onReveal={() => handleReveal(record.type)}
+                    onReveal={() => handleReveal(record.typeLabel)}
                   />
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">

@@ -40,6 +40,7 @@ const getFileIcon = (type: string) => {
 export const SecureFiles: React.FC = () => {
   const [files, setFiles] = useState<SecureFile[]>(mockFiles);
   const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -56,12 +57,45 @@ export const SecureFiles: React.FC = () => {
     setIsDragging(false);
     
     const droppedFiles = Array.from(e.dataTransfer.files);
-    if (droppedFiles.length > 0) {
-      toast.success('Files uploaded and encrypted', {
-        description: `${droppedFiles.length} file(s) encrypted and stored securely.`,
-      });
+    processFiles(droppedFiles);
+  }, []);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
+    processFiles(selectedFiles);
+    // Reset the input so the same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   }, []);
+
+  const processFiles = (fileList: File[]) => {
+    if (fileList.length === 0) return;
+
+    const newFiles: SecureFile[] = fileList.map((file, index) => ({
+      id: `${Date.now()}-${index}`,
+      name: file.name,
+      type: file.type || 'application/octet-stream',
+      size: formatFileSize(file.size),
+      uploadedAt: new Date().toISOString().split('T')[0],
+      encrypted: true,
+    }));
+
+    setFiles(prev => [...newFiles, ...prev]);
+    toast.success('Files uploaded and encrypted', {
+      description: `${fileList.length} file(s) encrypted and stored securely.`,
+    });
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const handleBrowseClick = () => {
+    fileInputRef.current?.click();
+  };
 
   const handleDelete = (id: string) => {
     setFiles(files.filter(f => f.id !== id));
@@ -113,7 +147,15 @@ export const SecureFiles: React.FC = () => {
             <p className="text-muted-foreground mb-4">
               Supported formats: PDF, JPG, PNG (Max 10MB)
             </p>
-            <Button variant="outline" className="gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              className="hidden"
+              multiple
+              accept="image/*,.pdf"
+            />
+            <Button variant="outline" className="gap-2" onClick={handleBrowseClick}>
               <Upload className="w-4 h-4" />
               Browse Files
             </Button>
