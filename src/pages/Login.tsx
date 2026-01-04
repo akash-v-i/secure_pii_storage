@@ -19,23 +19,37 @@ export const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Enhanced email validation - RFC 5322 compliant
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
     return emailRegex.test(email);
   };
 
-  const validatePassword = (password: string): boolean => {
-    return password.length >= 6;
+  const validatePassword = (password: string): { valid: boolean; message?: string } => {
+    if (password.length < 8) {
+      return { valid: false, message: 'Password must be at least 8 characters' };
+    }
+    if (!/[A-Z]/.test(password)) {
+      return { valid: false, message: 'Password must contain at least one uppercase letter' };
+    }
+    if (!/[a-z]/.test(password)) {
+      return { valid: false, message: 'Password must contain at least one lowercase letter' };
+    }
+    if (!/[0-9]/.test(password)) {
+      return { valid: false, message: 'Password must contain at least one number' };
+    }
+    return { valid: true };
   };
 
   const validateForm = (): boolean => {
     const errors: { email?: string; password?: string } = {};
     
     if (!validateEmail(email)) {
-      errors.email = 'Please enter a valid email address';
+      errors.email = 'Please enter a valid email address (e.g., user@domain.com)';
     }
     
-    if (!validatePassword(password)) {
-      errors.password = 'Password must be at least 6 characters';
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      errors.password = passwordCheck.message;
     }
     
     setFieldErrors(errors);
@@ -161,7 +175,7 @@ export const Login: React.FC = () => {
                   <Input
                     id="password"
                     type="password"
-                    placeholder="Enter password (min 6 chars)"
+                    placeholder="Min 8 chars, upper, lower, number"
                     className={`pl-10 ${fieldErrors.password ? 'border-destructive' : ''}`}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -215,9 +229,9 @@ export const Login: React.FC = () => {
 
             <div className="mt-6 pt-6 border-t border-border">
               <p className="text-xs text-muted-foreground text-center">
-                Demo: <span className="font-mono">admin@vault.com/admin123</span>, 
-                <span className="font-mono"> user@vault.com/user123</span>, or 
-                <span className="font-mono"> auditor@vault.com/auditor123</span>
+                Demo: <span className="font-mono">admin@vault.com/Admin123</span>, 
+                <span className="font-mono"> user@vault.com/User1234</span>, or 
+                <span className="font-mono"> auditor@vault.com/Audit123</span>
               </p>
             </div>
           </div>

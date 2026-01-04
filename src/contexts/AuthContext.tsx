@@ -9,11 +9,11 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock user data for demonstration
+// Mock user data for demonstration (passwords follow: min 8 chars, upper, lower, number)
 const mockUsers: Record<string, { password: string; role: UserRole; name: string }> = {
-  'admin@vault.com': { password: 'admin123', role: 'admin', name: 'Admin User' },
-  'user@vault.com': { password: 'user123', role: 'user', name: 'Demo User' },
-  'auditor@vault.com': { password: 'auditor123', role: 'auditor', name: 'Auditor User' },
+  'admin@vault.com': { password: 'Admin123', role: 'admin', name: 'Admin User' },
+  'user@vault.com': { password: 'User1234', role: 'user', name: 'Demo User' },
+  'auditor@vault.com': { password: 'Audit123', role: 'auditor', name: 'Auditor User' },
 };
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
