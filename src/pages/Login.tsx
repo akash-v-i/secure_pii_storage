@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { Shield, Lock, User, RefreshCw, AlertCircle, Mail } from 'lucide-react';
+import { Shield, Lock, User, RefreshCw, AlertCircle, Mail, UserPlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,18 +8,21 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const Login: React.FC = () => {
-  const { login, isAuthenticated } = useAuth();
+  const { login, register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [captcha, setCaptcha] = useState('');
   const [error, setError] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [success, setSuccess] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; password?: string; confirmPassword?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const validateEmail = (email: string): boolean => {
-    // Enhanced email validation - RFC 5322 compliant
     const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
     return emailRegex.test(email);
   };
@@ -37,11 +40,18 @@ export const Login: React.FC = () => {
     if (!/[0-9]/.test(password)) {
       return { valid: false, message: 'Password must contain at least one number' };
     }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      return { valid: false, message: 'Password must contain at least one special character (!@#$%^&*...)' };
+    }
     return { valid: true };
   };
 
   const validateForm = (): boolean => {
-    const errors: { email?: string; password?: string } = {};
+    const errors: { name?: string; email?: string; password?: string; confirmPassword?: string } = {};
+    
+    if (isRegisterMode && name.trim().length < 2) {
+      errors.name = 'Name must be at least 2 characters';
+    }
     
     if (!validateEmail(email)) {
       errors.email = 'Please enter a valid email address (e.g., user@domain.com)';
@@ -50,6 +60,10 @@ export const Login: React.FC = () => {
     const passwordCheck = validatePassword(password);
     if (!passwordCheck.valid) {
       errors.password = passwordCheck.message;
+    }
+    
+    if (isRegisterMode && password !== confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
     }
     
     setFieldErrors(errors);
@@ -63,6 +77,7 @@ export const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setFieldErrors({});
 
     if (!validateForm()) {
@@ -72,17 +87,40 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const success = await login(email, password, captcha);
-      if (success) {
-        navigate('/dashboard');
+      if (isRegisterMode) {
+        const result = register(email, password, name);
+        if (result.success) {
+          setSuccess('Account created successfully! You can now log in.');
+          setIsRegisterMode(false);
+          setPassword('');
+          setConfirmPassword('');
+          setCaptcha('');
+        } else {
+          setError(result.message || 'Registration failed. Please try again.');
+        }
       } else {
-        setError('Invalid credentials or CAPTCHA. Please try again.');
+        const success = await login(email, password, captcha);
+        if (success) {
+          navigate('/dashboard');
+        } else {
+          setError('Invalid credentials or CAPTCHA. Please try again.');
+        }
       }
     } catch {
       setError('An error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const toggleMode = () => {
+    setIsRegisterMode(!isRegisterMode);
+    setError('');
+    setSuccess('');
+    setFieldErrors({});
+    setPassword('');
+    setConfirmPassword('');
+    setCaptcha('');
   };
 
   return (
@@ -119,7 +157,7 @@ export const Login: React.FC = () => {
         </div>
       </div>
 
-      {/* Right Panel - Login Form */}
+      {/* Right Panel - Login/Register Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
@@ -133,11 +171,13 @@ export const Login: React.FC = () => {
           <div className="bg-card rounded-2xl border border-border p-8 shadow-card">
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/5 mb-4">
-                <Lock className="w-6 h-6 text-primary" />
+                {isRegisterMode ? <UserPlus className="w-6 h-6 text-primary" /> : <Lock className="w-6 h-6 text-primary" />}
               </div>
-              <h2 className="text-xl font-semibold text-foreground">Secure Login</h2>
+              <h2 className="text-xl font-semibold text-foreground">
+                {isRegisterMode ? 'Create Account' : 'Secure Login'}
+              </h2>
               <p className="text-muted-foreground mt-1 text-sm">
-                Enter your credentials to access your vault
+                {isRegisterMode ? 'Register to create your secure vault' : 'Enter your credentials to access your vault'}
               </p>
             </div>
 
@@ -148,7 +188,35 @@ export const Login: React.FC = () => {
               </Alert>
             )}
 
+            {success && (
+              <Alert className="mb-6 border-green-500 bg-green-50 text-green-800">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{success}</AlertDescription>
+              </Alert>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-5">
+              {isRegisterMode && (
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="name"
+                      type="text"
+                      placeholder="Enter your full name"
+                      className={`pl-10 ${fieldErrors.name ? 'border-destructive' : ''}`}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  {fieldErrors.name && (
+                    <p className="text-sm text-destructive">{fieldErrors.name}</p>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
@@ -175,7 +243,7 @@ export const Login: React.FC = () => {
                   <Input
                     id="password"
                     type="password"
-                    placeholder="Min 8 chars, upper, lower, number"
+                    placeholder="Min 8 chars, upper, lower, number, special"
                     className={`pl-10 ${fieldErrors.password ? 'border-destructive' : ''}`}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -187,25 +255,48 @@ export const Login: React.FC = () => {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="captcha">Security Verification</Label>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 bg-muted rounded-lg px-4 py-3 font-mono text-lg tracking-widest text-center select-none">
-                    SECURE
+              {isRegisterMode && (
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      placeholder="Re-enter your password"
+                      className={`pl-10 ${fieldErrors.confirmPassword ? 'border-destructive' : ''}`}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                    />
                   </div>
-                  <Button type="button" variant="outline" size="icon" className="shrink-0">
-                    <RefreshCw className="w-4 h-4" />
-                  </Button>
+                  {fieldErrors.confirmPassword && (
+                    <p className="text-sm text-destructive">{fieldErrors.confirmPassword}</p>
+                  )}
                 </div>
-                <Input
-                  id="captcha"
-                  type="text"
-                  placeholder="Type the word above"
-                  value={captcha}
-                  onChange={(e) => setCaptcha(e.target.value)}
-                  required
-                />
-              </div>
+              )}
+
+              {!isRegisterMode && (
+                <div className="space-y-2">
+                  <Label htmlFor="captcha">Security Verification</Label>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-muted rounded-lg px-4 py-3 font-mono text-lg tracking-widest text-center select-none">
+                      SECURE
+                    </div>
+                    <Button type="button" variant="outline" size="icon" className="shrink-0">
+                      <RefreshCw className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <Input
+                    id="captcha"
+                    type="text"
+                    placeholder="Type the word above"
+                    value={captcha}
+                    onChange={(e) => setCaptcha(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
 
               <Button 
                 type="submit" 
@@ -216,24 +307,38 @@ export const Login: React.FC = () => {
                 {isLoading ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    Authenticating...
+                    {isRegisterMode ? 'Creating Account...' : 'Authenticating...'}
                   </>
                 ) : (
                   <>
-                    <Lock className="w-4 h-4" />
-                    Login Securely
+                    {isRegisterMode ? <UserPlus className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                    {isRegisterMode ? 'Create Account' : 'Login Securely'}
                   </>
                 )}
               </Button>
             </form>
 
-            <div className="mt-6 pt-6 border-t border-border">
-              <p className="text-xs text-muted-foreground text-center">
-                Demo: <span className="font-mono">admin@vault.com/Admin123</span>, 
-                <span className="font-mono"> user@vault.com/User1234</span>, or 
-                <span className="font-mono"> auditor@vault.com/Audit123</span>
+            <div className="mt-6 pt-6 border-t border-border text-center">
+              <p className="text-sm text-muted-foreground">
+                {isRegisterMode ? 'Already have an account?' : "Don't have an account?"}
+                <Button 
+                  variant="link" 
+                  className="px-1 text-primary" 
+                  onClick={toggleMode}
+                >
+                  {isRegisterMode ? 'Login' : 'Register'}
+                </Button>
               </p>
             </div>
+
+            {!isRegisterMode && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-xs text-muted-foreground text-center">
+                  Demo: <span className="font-mono">admin@vault.com/Admin123!</span>, 
+                  <span className="font-mono"> user@vault.com/User1234!</span>
+                </p>
+              </div>
+            )}
           </div>
 
           <p className="text-center text-xs text-muted-foreground mt-6">
