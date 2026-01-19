@@ -14,8 +14,8 @@ from utils.jwt_handler import verify_password, get_password_hash, create_access_
 from utils.validation import validate_email_format, validate_password_strength, sanitize_input
 from utils.logger import setup_logger
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
+
 from utils.geoip import get_location_from_ip
 
 router = APIRouter()

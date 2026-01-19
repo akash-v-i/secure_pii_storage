@@ -40,17 +40,21 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 cors_origins_str = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:4173")
 cors_origins = [origin.strip() for origin in cors_origins_str.split(",") if origin.strip()]
 
+print(f"DIAGNOSTIC: ENVIRONMENT is '{os.getenv('ENVIRONMENT')}'")
+print(f"DIAGNOSTIC: CORS_ORIGINS requested are {cors_origins}")
+
 # In production, you might want to restrict this further, but let's make it easy to start
 if os.getenv("ENVIRONMENT") == "development":
-    # More permissive for development
+    print("DIAGNOSTIC: CORS mode is DEVELOPMENT (allow all origins, credentials disabled for wildcard)")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
+        allow_credentials=False, # Must be False if origins is ["*"]
         allow_methods=["*"],
         allow_headers=["*"],
     )
 else:
+    print(f"DIAGNOSTIC: CORS mode is PRODUCTION (restricted to {cors_origins})")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
@@ -58,6 +62,9 @@ else:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+
+
 
 
 # Include routers
