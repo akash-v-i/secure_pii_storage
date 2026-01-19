@@ -8,9 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const Login: React.FC = () => {
-  const { login, register, isAuthenticated } = useAuth();
+  const { login, register, isAuthenticated, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
-  
+
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -20,7 +20,7 @@ export const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; password?: string; confirmPassword?: string }>({});
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
@@ -48,27 +48,39 @@ export const Login: React.FC = () => {
 
   const validateForm = (): boolean => {
     const errors: { name?: string; email?: string; password?: string; confirmPassword?: string } = {};
-    
+
     if (isRegisterMode && name.trim().length < 2) {
       errors.name = 'Name must be at least 2 characters';
     }
-    
+
     if (!validateEmail(email)) {
       errors.email = 'Please enter a valid email address (e.g., user@domain.com)';
     }
-    
+
     const passwordCheck = validatePassword(password);
     if (!passwordCheck.valid) {
       errors.password = passwordCheck.message;
     }
-    
+
     if (isRegisterMode && password !== confirmPassword) {
       errors.confirmPassword = 'Passwords do not match';
     }
-    
+
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
@@ -84,11 +96,11 @@ export const Login: React.FC = () => {
       return;
     }
 
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     try {
       if (isRegisterMode) {
-        const result = register(email, password, name);
+        const result = await register(email, password, name);
         if (result.success) {
           setSuccess('Account created successfully! You can now log in.');
           setIsRegisterMode(false);
@@ -106,10 +118,11 @@ export const Login: React.FC = () => {
           setError('Invalid credentials or CAPTCHA. Please try again.');
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('Login error:', err);
       setError('An error occurred. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -124,9 +137,9 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen lg:h-screen w-full lg:overflow-hidden bg-background flex flex-col lg:flex-row">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 gradient-header items-center justify-center p-12">
+      <div className="hidden lg:flex lg:w-1/2 gradient-header items-center justify-center p-12 lg:overflow-y-auto">
         <div className="max-w-md text-center">
           <div className="w-20 h-20 rounded-2xl gradient-secure mx-auto flex items-center justify-center mb-8 shadow-secure">
             <Shield className="w-10 h-10 text-secure-foreground" />
@@ -135,7 +148,7 @@ export const Login: React.FC = () => {
             Secure PII Vault
           </h1>
           <p className="text-primary-foreground/70 text-lg leading-relaxed">
-            Your personal information, protected with enterprise-grade encryption. 
+            Your personal information, protected with enterprise-grade encryption.
             Access your sensitive data with confidence.
           </p>
           <div className="mt-12 flex items-center justify-center gap-8 text-primary-foreground/50">
@@ -158,7 +171,7 @@ export const Login: React.FC = () => {
       </div>
 
       {/* Right Panel - Login/Register Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
@@ -298,13 +311,13 @@ export const Login: React.FC = () => {
                 </div>
               )}
 
-              <Button 
-                type="submit" 
-                className="w-full" 
+              <Button
+                type="submit"
+                className="w-full"
                 size="lg"
-                disabled={isLoading}
+                disabled={isSubmitting}
               >
-                {isLoading ? (
+                {isSubmitting ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
                     {isRegisterMode ? 'Creating Account...' : 'Authenticating...'}
@@ -321,9 +334,9 @@ export const Login: React.FC = () => {
             <div className="mt-6 pt-6 border-t border-border text-center">
               <p className="text-sm text-muted-foreground">
                 {isRegisterMode ? 'Already have an account?' : "Don't have an account?"}
-                <Button 
-                  variant="link" 
-                  className="px-1 text-primary" 
+                <Button
+                  variant="link"
+                  className="px-1 text-primary"
                   onClick={toggleMode}
                 >
                   {isRegisterMode ? 'Login' : 'Register'}
@@ -334,7 +347,7 @@ export const Login: React.FC = () => {
             {!isRegisterMode && (
               <div className="mt-4 pt-4 border-t border-border">
                 <p className="text-xs text-muted-foreground text-center">
-                  Demo: <span className="font-mono">admin@vault.com/Admin123!</span>, 
+                  Demo: <span className="font-mono">admin@vault.com/Admin123!</span>,
                   <span className="font-mono"> user@vault.com/User1234!</span>
                 </p>
               </div>

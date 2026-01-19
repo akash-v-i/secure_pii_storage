@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { vaultAPI } from '@/lib/api';
 import { Bell, ShieldAlert, MapPin, UserX, Eye, Trash2, CheckCircle } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -17,53 +18,6 @@ interface Alert {
   severity: 'info' | 'warning' | 'critical';
 }
 
-const mockAlerts: Alert[] = [
-  {
-    id: '1',
-    type: 'new_ip',
-    title: 'New IP Address Login',
-    description: 'Login detected from 192.168.1.45 (San Francisco, US)',
-    timestamp: '2024-01-15 14:30:00',
-    isRead: false,
-    severity: 'warning',
-  },
-  {
-    id: '2',
-    type: 'failed_login',
-    title: 'Multiple Failed Login Attempts',
-    description: '5 failed login attempts detected in the last hour',
-    timestamp: '2024-01-15 12:15:00',
-    isRead: false,
-    severity: 'critical',
-  },
-  {
-    id: '3',
-    type: 'pii_access',
-    title: 'PII Record Accessed',
-    description: 'Your SSN record was viewed and logged',
-    timestamp: '2024-01-14 16:45:00',
-    isRead: true,
-    severity: 'info',
-  },
-  {
-    id: '4',
-    type: 'expiry',
-    title: 'Record Expiry Reminder',
-    description: 'Your phone number record will expire in 7 days',
-    timestamp: '2024-01-14 09:00:00',
-    isRead: true,
-    severity: 'warning',
-  },
-  {
-    id: '5',
-    type: 'pii_access',
-    title: 'PII Record Accessed',
-    description: 'Your email address record was viewed and logged',
-    timestamp: '2024-01-13 11:30:00',
-    isRead: true,
-    severity: 'info',
-  },
-];
 
 const getAlertIcon = (type: string) => {
   switch (type) {
@@ -107,12 +61,28 @@ const getSeverityStyles = (severity: string) => {
 };
 
 export const Alerts: React.FC = () => {
-  const [alerts, setAlerts] = useState<Alert[]>(mockAlerts);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch alerts on mount
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const data = await vaultAPI.getAlerts();
+        setAlerts(data);
+      } catch (error) {
+        console.error('Failed to load alerts', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAlerts();
+  }, []);
 
   const unreadCount = alerts.filter(a => !a.isRead).length;
 
   const markAsRead = (id: string) => {
-    setAlerts(alerts.map(a => 
+    setAlerts(alerts.map(a =>
       a.id === id ? { ...a, isRead: true } : a
     ));
   };
@@ -162,7 +132,7 @@ export const Alerts: React.FC = () => {
                   <div className={cn("p-2.5 rounded-lg", styles.iconBg)}>
                     <Icon className={cn("w-5 h-5", styles.iconColor)} />
                   </div>
-                  
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className={cn(

@@ -1,5 +1,5 @@
-import React, { useState, useSyncExternalStore } from 'react';
-import { Lock, Plus, Trash2, Search, Filter } from 'lucide-react';
+import React, { useState, useSyncExternalStore, useEffect } from 'react';
+import { Lock, Plus, Trash2, Search, Filter, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { SecureValueCell } from '@/components/common/SecureValueCell';
 import { Button } from '@/components/ui/button';
@@ -27,28 +27,74 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { piiStore, PIIRecord } from '@/stores/piiStore';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const Vault: React.FC = () => {
   const navigate = useNavigate();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const records = useSyncExternalStore(piiStore.subscribe, piiStore.getRecords, piiStore.getRecords);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load records only after authentication is ready
+  useEffect(() => {
+    const loadRecords = async () => {
+      // Wait for auth to complete
+      if (authLoading) {
+        return;
+      }
+
+      // If not authenticated, don't try to load
+      if (!isAuthenticated) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        // Small delay to ensure token is set in localStorage
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await piiStore.loadRecords();
+      } catch (error) {
+        toast.error('Failed to load PII records', {
+          description: 'Please try refreshing the page.',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadRecords();
+  }, [authLoading, isAuthenticated]);
 
   const filteredRecords = records.filter(record =>
     record.typeLabel.toLowerCase().includes(searchQuery.toLowerCase()) ||
     record.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleDelete = (id: string) => {
-    piiStore.deleteRecord(id);
-    toast.success('PII record deleted successfully', {
-      description: 'The encrypted data has been permanently removed.',
-    });
+  const handleDelete = async (id: string | number) => {
+    try {
+      await piiStore.deleteRecord(id);
+      toast.success('PII record deleted successfully', {
+        description: 'The encrypted data has been permanently removed.',
+      });
+    } catch (error) {
+      toast.error('Failed to delete record', {
+        description: 'Please try again.',
+      });
+    }
   };
 
-  const handleReveal = (recordType: string) => {
-    toast.info('Access logged', {
-      description: `Your access to "${recordType}" has been recorded in the audit log.`,
-    });
+  const handleReveal = async (recordId: string | number, recordType: string) => {
+    try {
+      await piiStore.retrieveRecord(recordId);
+      toast.info('Access logged', {
+        description: `Your access to "${recordType}" has been recorded in the audit log.`,
+      });
+    } catch (error) {
+      toast.error('Failed to retrieve record', {
+        description: 'Please try again.',
+      });
+    }
   };
 
   const isExpiringSoon = (expiryDate?: string) => {
@@ -131,7 +177,7 @@ export const Vault: React.FC = () => {
                   <SecureValueCell
                     value={record.value}
                     revealDuration={5}
-                    onReveal={() => handleReveal(record.typeLabel)}
+                    onReveal={() => handleReveal(record.id, record.typeLabel)}
                   />
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
@@ -191,12 +237,17 @@ export const Vault: React.FC = () => {
           </TableBody>
         </Table>
         
-        {filteredRecords.length === 0 && (
+        {isLoading ? (
+          <div className="text-center py-12">
+            <Loader2 className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4 animate-spin" />
+            <p className="text-muted-foreground">Loading PII records...</p>
+          </div>
+        ) : filteredRecords.length === 0 ? (
           <div className="text-center py-12">
             <Lock className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
             <p className="text-muted-foreground">No PII records found</p>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

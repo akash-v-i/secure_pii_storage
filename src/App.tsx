@@ -46,4 +46,8 @@ const App = () => (
   </QueryClientProvider>
 );
 
+// Auto-cleanup on app start
+import { piiStore } from "@/stores/piiStore";
+piiStore.cleanupExpiredRecords();
+
 export default App;

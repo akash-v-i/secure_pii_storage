@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
@@ -61,15 +61,15 @@
     --secure: 160 84% 39%;
     --secure-foreground: 0 0% 100%;
     --secure-muted: 160 40% 94%;
-    
+
     --vault-blur: 8px;
     --glass-bg: 0 0% 100% / 0.7;
-    
+
     /* Gradients */
     --gradient-secure: linear-gradient(135deg, hsl(160 84% 39%), hsl(160 84% 29%));
     --gradient-primary: linear-gradient(135deg, hsl(215 28% 17%), hsl(215 28% 25%));
     --gradient-header: linear-gradient(180deg, hsl(215 28% 17%), hsl(215 28% 22%));
-    
+
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
@@ -118,6 +118,24 @@
     @apply border-border;
   }
 
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', sans-serif;
@@ -129,70 +147,75 @@
     filter: blur(var(--vault-blur));
     transition: filter 0.3s ease;
   }
-  
+
   .blur-secure:hover,
   .blur-secure.revealed {
     filter: blur(0);
   }
-  
+
   .glass-card {
     background: hsl(var(--glass-bg));
     backdrop-filter: blur(10px);
   }
-  
+
   .secure-glow {
     box-shadow: var(--shadow-secure);
   }
-  
+
   .gradient-secure {
     background: var(--gradient-secure);
   }
-  
+
   .gradient-primary {
     background: var(--gradient-primary);
   }
-  
+
   .gradient-header {
     background: var(--gradient-header);
   }
-  
+
   .animate-pulse-secure {
     animation: pulse-secure 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
-  
+
   @keyframes pulse-secure {
-    0%, 100% {
+
+    0%,
+    100% {
       opacity: 1;
     }
+
     50% {
       opacity: 0.7;
     }
   }
-  
+
   .animate-fade-in {
     animation: fade-in 0.3s ease-out;
   }
-  
+
   @keyframes fade-in {
     from {
       opacity: 0;
       transform: translateY(10px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
-  
+
   .animate-slide-in {
     animation: slide-in 0.4s ease-out;
   }
-  
+
   @keyframes slide-in {
     from {
       opacity: 0;
       transform: translateX(-20px);
     }
+
     to {
       opacity: 1;
       transform: translateX(0);

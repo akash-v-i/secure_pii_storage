@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { authAPI } from '@/lib/api';
 import { Clock, MapPin, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Badge } from '@/components/ui/badge';
@@ -22,15 +23,6 @@ interface LoginEntry {
   device?: string;
 }
 
-const mockLoginHistory: LoginEntry[] = [
-  { id: '1', timestamp: '2024-01-15 14:30:00', ipAddress: '192.168.1.45', country: 'United States', city: 'San Francisco', status: 'success', device: 'Chrome / macOS' },
-  { id: '2', timestamp: '2024-01-15 12:15:00', ipAddress: '10.0.0.25', country: 'United States', city: 'San Francisco', status: 'failed', device: 'Firefox / Windows' },
-  { id: '3', timestamp: '2024-01-14 16:45:00', ipAddress: '192.168.1.45', country: 'United States', city: 'San Francisco', status: 'success', device: 'Chrome / macOS' },
-  { id: '4', timestamp: '2024-01-14 09:00:00', ipAddress: '172.16.0.100', country: 'Germany', city: 'Berlin', status: 'blocked', device: 'Unknown' },
-  { id: '5', timestamp: '2024-01-13 11:30:00', ipAddress: '192.168.1.45', country: 'United States', city: 'San Francisco', status: 'success', device: 'Safari / iOS' },
-  { id: '6', timestamp: '2024-01-12 08:20:00', ipAddress: '192.168.1.45', country: 'United States', city: 'San Francisco', status: 'success', device: 'Chrome / macOS' },
-  { id: '7', timestamp: '2024-01-11 15:10:00', ipAddress: '192.168.1.45', country: 'United States', city: 'San Francisco', status: 'failed', device: 'Chrome / macOS' },
-];
 
 const getStatusConfig = (status: string) => {
   switch (status) {
@@ -62,9 +54,30 @@ const getStatusConfig = (status: string) => {
 };
 
 export const LoginHistory: React.FC = () => {
-  const successCount = mockLoginHistory.filter(l => l.status === 'success').length;
-  const failedCount = mockLoginHistory.filter(l => l.status === 'failed').length;
-  const blockedCount = mockLoginHistory.filter(l => l.status === 'blocked').length;
+  const [history, setHistory] = useState<LoginEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const data = await authAPI.getLoginHistory();
+        setHistory(data.map((entry: any) => ({
+          ...entry,
+          country: entry.location ? entry.location.split(',')[1]?.trim() || '' : 'Unknown',
+          city: entry.location ? entry.location.split(',')[0]?.trim() || '' : 'Unknown',
+        })));
+      } catch (error) {
+        console.error("Failed to load history", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
+
+  const successCount = history.filter(l => l.status === 'success').length;
+  const failedCount = history.filter(l => l.status === 'failed').length;
+  const blockedCount = history.filter(l => l.status === 'blocked').length;
 
   return (
     <div className="animate-fade-in">
@@ -119,7 +132,7 @@ export const LoginHistory: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockLoginHistory.map((entry) => {
+              {history.map((entry) => {
                 const statusConfig = getStatusConfig(entry.status);
                 const StatusIcon = statusConfig.icon;
 

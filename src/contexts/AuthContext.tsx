@@ -1,102 +1,150 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, UserRole, AuthState } from '@/types/auth';
+import { authAPI, isTokenExpired } from '@/lib/api';
+import { jwtDecode } from 'jwt-decode';
 
-interface RegisteredUser {
-  email: string;
-  password: string;
-  name: string;
-  role: UserRole;
+interface DecodedToken {
+  sub: number;
+  role: string;
+  exp: number;
 }
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string, captcha: string) => Promise<boolean>;
   logout: () => void;
-  register: (email: string, password: string, name: string) => { success: boolean; message?: string };
+  register: (email: string, password: string, name: string) => Promise<{ success: boolean; message?: string }>;
   hasRole: (roles: UserRole[]) => boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Load registered users from localStorage
-const getRegisteredUsers = (): Record<string, RegisteredUser> => {
-  try {
-    const stored = localStorage.getItem('vault_registered_users');
-    return stored ? JSON.parse(stored) : {};
-  } catch {
-    return {};
-  }
-};
-
-const saveRegisteredUsers = (users: Record<string, RegisteredUser>) => {
-  localStorage.setItem('vault_registered_users', JSON.stringify(users));
-};
-
-// Default demo users
-const defaultUsers: Record<string, RegisteredUser> = {
-  'admin@vault.com': { email: 'admin@vault.com', password: 'Admin123!', role: 'admin', name: 'Admin User' },
-  'user@vault.com': { email: 'user@vault.com', password: 'User1234!', role: 'user', name: 'Demo User' },
-  'auditor@vault.com': { email: 'auditor@vault.com', password: 'Audit123!', role: 'auditor', name: 'Auditor User' },
-};
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
   });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const getAllUsers = (): Record<string, RegisteredUser> => {
-    const registered = getRegisteredUsers();
-    return { ...defaultUsers, ...registered };
-  };
+  // Load user from token on mount
+  useEffect(() => {
+    const initializeAuth = async () => {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        if (isTokenExpired(token)) {
+          // Token expired, clear it
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('user');
+          setIsLoading(false);
+          return;
+        }
 
-  const register = (email: string, password: string, name: string): { success: boolean; message?: string } => {
-    const normalizedEmail = email.toLowerCase();
-    const allUsers = getAllUsers();
-    
-    if (allUsers[normalizedEmail]) {
-      return { success: false, message: 'An account with this email already exists.' };
-    }
-
-    const registeredUsers = getRegisteredUsers();
-    registeredUsers[normalizedEmail] = {
-      email: normalizedEmail,
-      password,
-      name,
-      role: 'user',
+        try {
+          // Get user info from API
+          const userData = await authAPI.getCurrentUser();
+          setAuthState({
+            user: {
+              id: userData.id.toString(),
+              username: userData.username,
+              email: userData.email,
+              role: userData.role as UserRole,
+              lastLogin: userData.lastLogin ? new Date(userData.lastLogin) : undefined,
+            },
+            isAuthenticated: true,
+          });
+        } catch (error: any) {
+          // Token invalid or expired - log for debugging
+          console.error('Failed to get current user:', error.response?.status, error.message);
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('user');
+        }
+      }
+      setIsLoading(false);
     };
-    saveRegisteredUsers(registeredUsers);
-    
-    return { success: true };
+
+    initializeAuth();
+  }, []);
+
+  const register = async (
+    email: string,
+    password: string,
+    name: string
+  ): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const response = await authAPI.register(email, password, name);
+      
+      if (response.success && response.access_token) {
+        // Store token
+        localStorage.setItem('access_token', response.access_token);
+        
+        // Decode token to get user info
+        const decoded = jwtDecode<DecodedToken>(response.access_token);
+        
+        // Get full user data
+        const userData = await authAPI.getCurrentUser();
+        
+        setAuthState({
+          user: {
+            id: userData.id.toString(),
+            username: userData.username,
+            email: userData.email,
+            role: userData.role as UserRole,
+            lastLogin: userData.lastLogin ? new Date(userData.lastLogin) : undefined,
+          },
+          isAuthenticated: true,
+        });
+
+        return { success: true, message: response.message };
+      }
+
+      return { success: false, message: response.message || 'Registration failed' };
+    } catch (error: any) {
+      const message =
+        error.response?.data?.detail || error.message || 'Registration failed. Please try again.';
+      return { success: false, message };
+    }
   };
 
   const login = async (email: string, password: string, captcha: string): Promise<boolean> => {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    if (captcha.toLowerCase() !== 'secure') {
-      return false;
-    }
-    
-    const allUsers = getAllUsers();
-    const user = allUsers[email.toLowerCase()];
-    
-    if (user && user.password === password) {
+    try {
+      const response = await authAPI.login(email, password, captcha);
+      
+      // Store token
+      localStorage.setItem('access_token', response.access_token);
+      
+      // Set user state
       setAuthState({
         user: {
-          id: crypto.randomUUID(),
-          username: user.name,
-          email: email.toLowerCase(),
-          role: user.role,
-          lastLogin: new Date(),
+          id: response.user.id.toString(),
+          username: response.user.username,
+          email: response.user.email,
+          role: response.user.role as UserRole,
+          lastLogin: response.user.lastLogin ? new Date(response.user.lastLogin) : undefined,
         },
         isAuthenticated: true,
       });
+
       return true;
+    } catch (error: any) {
+      console.error('Login error:', error);
+      return false;
     }
-    return false;
   };
 
-  const logout = () => {
-    setAuthState({ user: null, isAuthenticated: false });
+  const logout = async () => {
+    try {
+      await authAPI.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear local state regardless of API call result
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user');
+      setAuthState({
+        user: null,
+        isAuthenticated: false,
+      });
+    }
   };
 
   const hasRole = (roles: UserRole[]): boolean => {
@@ -105,7 +153,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ ...authState, login, logout, register, hasRole }}>
+    <AuthContext.Provider value={{ ...authState, login, logout, register, hasRole, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,13 +1,13 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Lock, 
-  Plus, 
-  FileText, 
-  Bell, 
-  Clock, 
-  FileSearch, 
+import {
+  LayoutDashboard,
+  Lock,
+  Plus,
+  FileText,
+  Bell,
+  Clock,
+  FileSearch,
   Settings,
   Shield,
   LogOut
@@ -25,13 +25,13 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
-  { label: 'PII Vault', path: '/vault', icon: <Lock size={20} /> },
-  { label: 'Add PII', path: '/add-pii', icon: <Plus size={20} /> },
-  { label: 'Secure Files', path: '/files', icon: <FileText size={20} /> },
-  { label: 'Alerts', path: '/alerts', icon: <Bell size={20} /> },
-  { label: 'Login History', path: '/login-history', icon: <Clock size={20} /> },
-  { label: 'Audit Logs', path: '/audit-logs', icon: <FileSearch size={20} />, roles: ['admin', 'auditor'] },
-  { label: 'Privacy', path: '/privacy', icon: <Settings size={20} /> },
+  { label: 'PII Vault', path: '/vault', icon: <Lock size={20} />, roles: ['user'] },
+  { label: 'Add PII', path: '/add-pii', icon: <Plus size={20} />, roles: ['user'] },
+  { label: 'Secure Files', path: '/files', icon: <FileText size={20} />, roles: ['user'] },
+  { label: 'Alerts', path: '/alerts', icon: <Bell size={20} />, roles: ['user'] },
+  { label: 'Login History', path: '/login-history', icon: <Clock size={20} />, roles: ['user'] },
+  { label: 'Audit Logs', path: '/audit-logs', icon: <FileSearch size={20} />, roles: ['auditor'] },
+  { label: 'Privacy', path: '/privacy', icon: <Settings size={20} />, roles: ['user'] },
 ];
 
 export const AppSidebar: React.FC = () => {
@@ -103,8 +103,8 @@ export const AppSidebar: React.FC = () => {
             </span>
           </div>
         </div>
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
           onClick={logout}
         >

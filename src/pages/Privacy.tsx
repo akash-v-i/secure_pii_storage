@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { vaultAPI } from '@/lib/api';
 import { Settings, Database, Clock, Download, Trash2, Shield, AlertTriangle } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -8,16 +9,47 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 
 export const Privacy: React.FC = () => {
+  const [stats, setStats] = useState<any>({
+    piiCount: 0,
+    fileCount: 0,
+    totalFileSize: 0,
+    expiringCount: 0,
+    auditCount: 0,
+    defaultRetention: '365 days'
+  });
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const data = await vaultAPI.getStats();
+        setStats(data);
+      } catch (error) {
+        console.error('Failed to load stats', error);
+      }
+    };
+    loadStats();
+  }, []);
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
   const handleBackup = () => {
     toast.success('Backup initiated', {
       description: 'Your encrypted backup is being prepared for download.',
     });
+    // In real app, call endpoint to generate zip
   };
 
   const handleDeletionRequest = () => {
     toast.info('Deletion request submitted', {
       description: 'Your request has been logged. You will receive confirmation within 24 hours.',
     });
+    // API call would go here
   };
 
   return (
@@ -46,21 +78,21 @@ export const Privacy: React.FC = () => {
                 <p className="font-medium text-foreground">PII Records</p>
                 <p className="text-sm text-muted-foreground">Encrypted personal information</p>
               </div>
-              <Badge variant="secondary">12 records</Badge>
+              <Badge variant="secondary">{stats.piiCount} records</Badge>
             </div>
             <div className="flex items-center justify-between py-3 border-b border-border">
               <div>
                 <p className="font-medium text-foreground">Encrypted Files</p>
                 <p className="text-sm text-muted-foreground">Documents and images</p>
               </div>
-              <Badge variant="secondary">5 files (45.2 MB)</Badge>
+              <Badge variant="secondary">{stats.fileCount} files ({formatFileSize(stats.totalFileSize)})</Badge>
             </div>
             <div className="flex items-center justify-between py-3">
               <div>
                 <p className="font-medium text-foreground">Audit Entries</p>
                 <p className="text-sm text-muted-foreground">Access and modification logs</p>
               </div>
-              <Badge variant="secondary">156 entries</Badge>
+              <Badge variant="secondary">{stats.auditCount} entries</Badge>
             </div>
           </CardContent>
         </Card>
@@ -82,7 +114,7 @@ export const Privacy: React.FC = () => {
                 <p className="font-medium text-foreground">Default Retention</p>
                 <p className="text-sm text-muted-foreground">How long to keep records</p>
               </div>
-              <Badge>365 days</Badge>
+              <Badge>{stats.defaultRetention}</Badge>
             </div>
             <div className="flex items-center justify-between py-3 border-b border-border">
               <div>
@@ -96,7 +128,7 @@ export const Privacy: React.FC = () => {
                 <p className="font-medium text-foreground">Records Expiring Soon</p>
                 <p className="text-sm text-muted-foreground">Within the next 30 days</p>
               </div>
-              <Badge variant="outline" className="border-warning text-warning">3 records</Badge>
+              <Badge variant="outline" className="border-warning text-warning">{stats.expiringCount} records</Badge>
             </div>
           </CardContent>
         </Card>
@@ -119,7 +151,7 @@ export const Privacy: React.FC = () => {
                 <div>
                   <p className="text-sm font-medium text-foreground">Encrypted Export</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Your backup will be encrypted with your master password. 
+                    Your backup will be encrypted with your master password.
                     Store it securely - we cannot recover lost backups.
                   </p>
                 </div>
@@ -155,7 +187,7 @@ export const Privacy: React.FC = () => {
                 <div>
                   <p className="text-sm font-medium text-destructive">Irreversible Action</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    This will permanently delete all your PII records, encrypted files, 
+                    This will permanently delete all your PII records, encrypted files,
                     and account data. This action cannot be undone.
                   </p>
                 </div>

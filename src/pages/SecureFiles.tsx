@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { vaultAPI } from '@/lib/api';
 import { FileText, Upload, Download, Trash2, Lock, File, Image, FileType } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -24,12 +25,6 @@ interface SecureFile {
   encrypted: boolean;
 }
 
-const mockFiles: SecureFile[] = [
-  { id: '1', name: 'passport_scan.pdf', type: 'application/pdf', size: '2.4 MB', uploadedAt: '2024-01-15', encrypted: true },
-  { id: '2', name: 'drivers_license.jpg', type: 'image/jpeg', size: '1.1 MB', uploadedAt: '2024-01-14', encrypted: true },
-  { id: '3', name: 'tax_return_2023.pdf', type: 'application/pdf', size: '4.8 MB', uploadedAt: '2024-01-10', encrypted: true },
-  { id: '4', name: 'birth_certificate.pdf', type: 'application/pdf', size: '892 KB', uploadedAt: '2024-01-05', encrypted: true },
-];
 
 const getFileIcon = (type: string) => {
   if (type.startsWith('image/')) return Image;
@@ -38,9 +33,36 @@ const getFileIcon = (type: string) => {
 };
 
 export const SecureFiles: React.FC = () => {
-  const [files, setFiles] = useState<SecureFile[]>(mockFiles);
+  const [files, setFiles] = useState<SecureFile[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    loadFiles();
+  }, []);
+
+  const loadFiles = async () => {
+    try {
+      setLoading(true);
+      const data = await vaultAPI.listFiles();
+      // Format the data to match SecureFile interface
+      const formattedFiles = data.map((f: any) => ({
+        id: String(f.id),
+        name: f.name,
+        type: f.type,
+        size: formatFileSize(f.size),
+        uploadedAt: new Date(f.uploadedAt).toISOString().split('T')[0],
+        encrypted: true
+      }));
+      setFiles(formattedFiles);
+    } catch (error) {
+      console.error('Failed to load files:', error);
+      toast.error('Failed to load files');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -55,7 +77,7 @@ export const SecureFiles: React.FC = () => {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const droppedFiles = Array.from(e.dataTransfer.files);
     processFiles(droppedFiles);
   }, []);
@@ -69,22 +91,40 @@ export const SecureFiles: React.FC = () => {
     }
   }, []);
 
-  const processFiles = (fileList: File[]) => {
+  const processFiles = async (fileList: File[]) => {
     if (fileList.length === 0) return;
 
-    const newFiles: SecureFile[] = fileList.map((file, index) => ({
-      id: `${Date.now()}-${index}`,
-      name: file.name,
-      type: file.type || 'application/octet-stream',
-      size: formatFileSize(file.size),
-      uploadedAt: new Date().toISOString().split('T')[0],
-      encrypted: true,
-    }));
+    const toastId = toast.loading(`Encrypting and uploading ${fileList.length} file(s)...`);
 
-    setFiles(prev => [...newFiles, ...prev]);
-    toast.success('Files uploaded and encrypted', {
-      description: `${fileList.length} file(s) encrypted and stored securely.`,
-    });
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const file of fileList) {
+      try {
+        await vaultAPI.uploadFile(file);
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to upload ${file.name}:`, error);
+        failCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`Successfully encrypted and uploaded ${successCount} file(s)`, {
+        id: toastId,
+      });
+      loadFiles(); // Reload list
+    }
+
+    if (failCount > 0) {
+      toast.error(`Failed to upload ${failCount} file(s)`, {
+        id: successCount === 0 ? toastId : undefined,
+      });
+    }
+
+    if (successCount === 0 && failCount === 0) {
+      toast.dismiss(toastId);
+    }
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -97,17 +137,28 @@ export const SecureFiles: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  const handleDelete = (id: string) => {
-    setFiles(files.filter(f => f.id !== id));
-    toast.success('File deleted', {
-      description: 'The encrypted file has been permanently removed.',
-    });
+  const handleDelete = async (id: string) => {
+    try {
+      await vaultAPI.deleteFile(id);
+      setFiles(files.filter(f => f.id !== id));
+      toast.success('File deleted', {
+        description: 'The encrypted file has been permanently removed.',
+      });
+    } catch (error) {
+      console.error('Failed to delete file:', error);
+      toast.error('Failed to delete file');
+    }
   };
 
-  const handleDownload = (file: SecureFile) => {
-    toast.info('Decrypting file...', {
-      description: `Preparing ${file.name} for download.`,
-    });
+  const handleDownload = async (file: SecureFile) => {
+    const toastId = toast.loading(`Decrypting and downloading ${file.name}...`);
+    try {
+      await vaultAPI.downloadFile(file.id, file.name);
+      toast.success('Download started', { id: toastId });
+    } catch (error) {
+      console.error('Download failed:', error);
+      toast.error('Download failed', { id: toastId });
+    }
   };
 
   return (
@@ -167,7 +218,7 @@ export const SecureFiles: React.FC = () => {
       <div className="bg-secure-muted border border-secure/20 rounded-lg p-4 mb-6 flex items-center gap-3">
         <Lock className="w-5 h-5 text-secure flex-shrink-0" />
         <p className="text-sm text-foreground">
-          <span className="font-medium">Client-Side Encryption:</span> Files are encrypted in your browser before upload. 
+          <span className="font-medium">Client-Side Encryption:</span> Files are encrypted in your browser before upload.
           Only you possess the decryption key.
         </p>
       </div>
@@ -209,8 +260,8 @@ export const SecureFiles: React.FC = () => {
                       {file.uploadedAt}
                     </TableCell>
                     <TableCell>
-                      <Badge 
-                        variant="outline" 
+                      <Badge
+                        variant="outline"
                         className="border-secure text-secure bg-secure/5 gap-1"
                       >
                         <Lock className="w-3 h-3" />

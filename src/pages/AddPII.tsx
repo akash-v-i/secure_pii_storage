@@ -15,29 +15,83 @@ import { toast } from 'sonner';
 import { piiStore } from '@/stores/piiStore';
 
 const PII_TYPES = [
-  { value: 'ssn', label: 'Social Security Number' },
+  { value: 'aadhaar', label: 'Aadhaar Number' },
+  { value: 'pan', label: 'PAN Card' },
+  { value: 'mobile', label: 'Mobile/Phone Number' },
+  { value: 'voter_id', label: 'Voter ID' },
+  { value: 'driving_license', label: 'Driving License' },
   { value: 'passport', label: 'Passport Number' },
-  { value: 'drivers_license', label: "Driver's License" },
-  { value: 'credit_card', label: 'Credit Card Number' },
-  { value: 'bank_account', label: 'Bank Account Number' },
-  { value: 'medical_id', label: 'Medical ID' },
-  { value: 'tax_id', label: 'Tax ID Number' },
-  { value: 'other', label: 'Other Sensitive Data' },
+  { value: 'gstin', label: 'GSTIN' },
+  { value: 'other', label: 'Other' },
 ] as const;
 
 const piiSchema = z.object({
   piiType: z.string().min(1, 'Please select a PII type'),
-  piiValue: z.string().min(1, 'PII value is required').max(500, 'Value must be less than 500 characters'),
+  piiValue: z.string().min(1, 'PII value is required'),
   label: z.string().min(2, 'Label must be at least 2 characters').max(100, 'Label must be less than 100 characters'),
   notes: z.string().max(500, 'Notes must be less than 500 characters').optional(),
   expiryDate: z.string().optional(),
+}).superRefine((data, ctx) => {
+  const { piiType, piiValue } = data;
+
+  if (piiType === 'other') return;
+
+  let isValid = true;
+  let message = 'Invalid format';
+  const cleanValue = piiValue.trim();
+
+  switch (piiType) {
+    case 'aadhaar':
+      // 12 digits, can have spaces or dashes: 1234-5678-9012 or 123456789012
+      isValid = /^\d{4}[-\s]?\d{4}[-\s]?\d{4}$/.test(cleanValue);
+      message = 'Invalid Aadhaar format. Expected 12 digits (e.g., 1234-5678-9012).';
+      break;
+    case 'pan':
+      // 10 alphanumeric: ABCDE1234F
+      isValid = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanValue);
+      message = 'Invalid PAN format. Expected 10 characters (e.g., ABCDE1234F).';
+      break;
+    case 'mobile':
+      // 10 digits, optional +91 prefix
+      isValid = /^(\+91[\-\s]?)?[6-9]\d{9}$/.test(cleanValue);
+      message = 'Invalid Mobile Number. Expected 10 digits.';
+      break;
+    case 'voter_id':
+      // 10 alphanumeric
+      isValid = /^[A-Z0-9]{10}$/.test(cleanValue);
+      message = 'Invalid Voter ID format. Expected 10 alphanumeric characters.';
+      break;
+    case 'driving_license':
+      // 13-15 alphanumeric
+      isValid = /^[A-Z0-9\/\-\s]{13,15}$/.test(cleanValue);
+      message = 'Invalid Driving License format. Expected 13-15 characters.';
+      break;
+    case 'passport':
+      // 8 alphanumeric
+      isValid = /^[A-Z0-9]{8}$/.test(cleanValue);
+      message = 'Invalid Passport Number. Expected 8 alphanumeric characters.';
+      break;
+    case 'gstin':
+      // 15 alphanumeric
+      isValid = /^[A-Z0-9]{15}$/.test(cleanValue);
+      message = 'Invalid GSTIN format. Expected 15 alphanumeric characters.';
+      break;
+  }
+
+  if (!isValid) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: message,
+      path: ['piiValue'],
+    });
+  }
 });
 
 type PIIFormData = z.infer<typeof piiSchema>;
 
 export const AddPII: React.FC = () => {
   const navigate = useNavigate();
-  
+
   const {
     register,
     handleSubmit,
@@ -59,39 +113,42 @@ export const AddPII: React.FC = () => {
   const selectedType = watch('piiType');
 
   const onSubmit = async (data: PIIFormData) => {
-    // Simulate encryption and storage
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const piiTypeInfo = PII_TYPES.find(t => t.value === data.piiType);
-    const piiLabel = piiTypeInfo?.label || data.piiType;
-    
-    // Add to the shared store
-    piiStore.addRecord({
-      type: data.piiType,
-      typeLabel: piiLabel,
-      value: data.piiValue,
-      label: data.label,
-      notes: data.notes,
-      expiryDate: data.expiryDate || undefined,
-    });
-    
-    toast.success('PII Record Encrypted & Stored', {
-      description: `Your ${piiLabel} has been securely encrypted and saved.`,
-    });
-    
-    reset();
-    navigate('/vault');
+    try {
+      const piiTypeInfo = PII_TYPES.find(t => t.value === data.piiType);
+      const piiLabel = piiTypeInfo?.label || data.piiType;
+
+      // Add to the backend via API
+      await piiStore.addRecord({
+        type: data.piiType,
+        typeLabel: piiLabel,
+        value: data.piiValue,
+        label: data.label,
+        notes: data.notes,
+        expiryDate: data.expiryDate || undefined,
+      });
+
+      toast.success('PII Record Encrypted & Stored', {
+        description: `Your ${piiLabel} has been securely encrypted and saved.`,
+      });
+
+      reset();
+      navigate('/vault');
+    } catch (error: any) {
+      toast.error('Failed to store PII record', {
+        description: error.response?.data?.detail || 'Please try again.',
+      });
+    }
   };
 
   const getPlaceholderForType = (type: string): string => {
     switch (type) {
-      case 'ssn': return '***-**-****';
-      case 'passport': return 'Passport number';
-      case 'drivers_license': return 'License number';
-      case 'credit_card': return '**** **** **** ****';
-      case 'bank_account': return 'Account number';
-      case 'medical_id': return 'Medical ID number';
-      case 'tax_id': return 'Tax ID number';
+      case 'aadhaar': return '1234-5678-9012';
+      case 'pan': return 'ABCDE1234F';
+      case 'mobile': return '9876543210';
+      case 'voter_id': return 'ABC1234567';
+      case 'driving_license': return 'DL14C1234567890';
+      case 'passport': return 'Z1234567';
+      case 'gstin': return '22AAAAA0000A1Z5';
       default: return 'Enter sensitive data';
     }
   };
@@ -117,7 +174,7 @@ export const AddPII: React.FC = () => {
           <div>
             <p className="text-sm font-medium text-foreground">End-to-End Encryption</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Your data will be encrypted using AES-256 before storage. 
+              Your data will be encrypted using AES-256 before storage.
               Only you can decrypt and view this information.
             </p>
           </div>
@@ -137,7 +194,7 @@ export const AddPII: React.FC = () => {
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="piiType">PII Type *</Label>
-                <Select 
+                <Select
                   value={selectedType}
                   onValueChange={(value) => setValue('piiType', value, { shouldValidate: true })}
                 >
