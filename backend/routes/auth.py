@@ -15,8 +15,9 @@ from utils.validation import validate_email_format, validate_password_strength, 
 from utils.logger import setup_logger
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
-
 from utils.geoip import get_location_from_ip
+import secrets
+import string
 
 router = APIRouter()
 security = HTTPBearer()
@@ -36,6 +37,7 @@ class LoginRequest(BaseModel):
     email: str
     password: str
     captcha: str
+    captcha_id: Optional[str] = None
 
 
 class LoginResponse(BaseModel):
@@ -48,6 +50,14 @@ class RegisterResponse(BaseModel):
     success: bool
     message: str
     access_token: Optional[str] = None
+
+@router.get("/captcha")
+async def get_captcha():
+    """Generate a new real-time CAPTCHA"""
+    text = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+    # Sign the captcha text with a 2-minute expiration
+    captcha_id = create_access_token(data={"sub": "captcha", "code": text}, expires_delta=timedelta(minutes=2))
+    return {"captcha": text, "captcha_id": captcha_id}
 
 
 def get_current_user(
@@ -199,12 +209,28 @@ async def login(
         )
 
         # Validate CAPTCHA
-        if request.captcha.lower() != "secure":
+        captcha_valid = False
+        captcha_input = request.captcha.upper()
+        
+        # 1. Verify dynamic captcha if captcha_id is provided
+        if request.captcha_id:
+            try:
+                payload = decode_access_token(request.captcha_id)
+                if payload and payload.get("sub") == "captcha" and payload.get("code") == captcha_input:
+                    captcha_valid = True
+            except:
+                pass
+        
+        # 3. Fallback to legacy 'secure' for backward compatibility during transition
+        elif captcha_input == "SECURE":
+            captcha_valid = True
+
+        if not captcha_valid:
             db.add(login_attempt)
             db.commit()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid CAPTCHA"
+                detail="Invalid or expired CAPTCHA"
             )
         
         # Find user

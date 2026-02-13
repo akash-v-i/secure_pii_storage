@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Shield, Lock, User, RefreshCw, AlertCircle, Mail, UserPlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { SecurityDemoModal } from '@/components/Login/SecurityDemoModal';
+import { authAPI } from '@/lib/api';
 
 export const Login: React.FC = () => {
   const { login, register, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -21,6 +23,22 @@ export const Login: React.FC = () => {
   const [success, setSuccess] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; password?: string; confirmPassword?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [captchaData, setCaptchaData] = useState<{ text: string; id: string | null }>({ text: 'SECURE', id: null });
+
+  const refreshCaptcha = async () => {
+    try {
+      const data = await authAPI.getCaptcha();
+      setCaptchaData({ text: data.captcha, id: data.captcha_id });
+    } catch (err) {
+      console.error('Failed to fetch captcha:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!isRegisterMode) {
+      refreshCaptcha();
+    }
+  }, [isRegisterMode]);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
@@ -111,11 +129,12 @@ export const Login: React.FC = () => {
           setError(result.message || 'Registration failed. Please try again.');
         }
       } else {
-        const success = await login(email, password, captcha);
+        const success = await login(email, password, captcha, captchaData.id || undefined);
         if (success) {
           navigate('/dashboard');
         } else {
           setError('Invalid credentials or CAPTCHA. Please try again.');
+          refreshCaptcha();
         }
       }
     } catch (err) {
@@ -166,6 +185,9 @@ export const Login: React.FC = () => {
               <div className="text-3xl font-bold text-secure">24/7</div>
               <div className="text-sm">Protected</div>
             </div>
+          </div>
+          <div className="mt-16 animate-pulse-secure">
+            <SecurityDemoModal />
           </div>
         </div>
       </div>
@@ -293,10 +315,23 @@ export const Login: React.FC = () => {
                 <div className="space-y-2">
                   <Label htmlFor="captcha">Security Verification</Label>
                   <div className="flex items-center gap-3">
-                    <div className="flex-1 bg-muted rounded-lg px-4 py-3 font-mono text-lg tracking-widest text-center select-none">
-                      SECURE
+                    <div className="flex-1 bg-muted rounded-lg px-4 py-3 font-mono text-lg tracking-widest text-center select-none relative overflow-hidden group">
+                      <div className="absolute inset-0 opacity-10 pointer-events-none select-none">
+                        <div className="absolute top-1/2 left-0 w-full h-[1px] bg-foreground -rotate-6" />
+                        <div className="absolute top-1/3 left-0 w-full h-[1px] bg-foreground rotate-3" />
+                      </div>
+                      <span className="relative z-10">{captchaData.text}</span>
                     </div>
-                    <Button type="button" variant="outline" size="icon" className="shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        refreshCaptcha();
+                      }}
+                    >
                       <RefreshCw className="w-4 h-4" />
                     </Button>
                   </div>
@@ -345,8 +380,9 @@ export const Login: React.FC = () => {
             </div>
 
             {!isRegisterMode && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <p className="text-xs text-muted-foreground text-center">
+              <div className="mt-4 pt-4 border-t border-border flex flex-col items-center gap-3">
+                <SecurityDemoModal />
+                <p className="text-[10px] text-muted-foreground text-center">
                   Demo: <span className="font-mono">admin@vault.com/Admin123!</span>,
                   <span className="font-mono"> user@vault.com/User1234!</span>
                 </p>

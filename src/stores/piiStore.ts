@@ -10,6 +10,7 @@ export interface PIIRecord {
   notes?: string;
   lastAccessed: string;
   expiryDate?: string;
+  accessCount?: number;
 }
 
 // Cache for records (to avoid constant API calls)
@@ -39,6 +40,7 @@ const convertToPIIRecord = (apiRecord: any): PIIRecord => {
     expiryDate: apiRecord.expiry_date
       ? new Date(apiRecord.expiry_date).toISOString().split('T')[0]
       : undefined,
+    accessCount: apiRecord.access_count || 0,
   };
 };
 
@@ -78,6 +80,7 @@ export const piiStore = {
         'credit_card': 'financial_info',
         'bank_account': 'financial_info',
         'medical_id': 'health_insurance',
+        'medical_data': 'health_insurance',
         'tax_id': 'government_identifiers',
         'other': 'basic_identifiers',
       };
@@ -117,6 +120,11 @@ export const piiStore = {
       console.error('Failed to delete PII record:', error);
       throw error;
     }
+  },
+
+  // Get actual records for visualization and graph
+  getRealRecords: (): PIIRecord[] => {
+    return piiRecordsCache;
   },
 
   // Retrieve full decrypted value

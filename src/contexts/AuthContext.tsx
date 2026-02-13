@@ -10,7 +10,7 @@ interface DecodedToken {
 }
 
 interface AuthContextType extends AuthState {
-  login: (email: string, password: string, captcha: string) => Promise<boolean>;
+  login: (email: string, password: string, captcha: string, captcha_id?: string) => Promise<boolean>;
   logout: () => void;
   register: (email: string, password: string, name: string) => Promise<{ success: boolean; message?: string }>;
   hasRole: (roles: UserRole[]) => boolean;
@@ -59,6 +59,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           localStorage.removeItem('user');
         }
       }
+
       setIsLoading(false);
     };
 
@@ -72,17 +73,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   ): Promise<{ success: boolean; message?: string }> => {
     try {
       const response = await authAPI.register(email, password, name);
-      
+
       if (response.success && response.access_token) {
         // Store token
         localStorage.setItem('access_token', response.access_token);
-        
+
         // Decode token to get user info
         const decoded = jwtDecode<DecodedToken>(response.access_token);
-        
+
         // Get full user data
         const userData = await authAPI.getCurrentUser();
-        
+
         setAuthState({
           user: {
             id: userData.id.toString(),
@@ -105,13 +106,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const login = async (email: string, password: string, captcha: string): Promise<boolean> => {
+  const login = async (email: string, password: string, captcha: string, captcha_id?: string): Promise<boolean> => {
     try {
-      const response = await authAPI.login(email, password, captcha);
-      
+      const response = await authAPI.login(email, password, captcha, captcha_id);
+
       // Store token
       localStorage.setItem('access_token', response.access_token);
-      
+
       // Set user state
       setAuthState({
         user: {

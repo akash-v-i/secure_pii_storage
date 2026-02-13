@@ -14,6 +14,8 @@ import SecureFiles from "./pages/SecureFiles";
 import LoginHistory from "./pages/LoginHistory";
 import AuditLogs from "./pages/AuditLogs";
 import Privacy from "./pages/Privacy";
+import Graph from "./pages/Graph";
+import AdminGraph from "./pages/AdminGraph";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +38,8 @@ const App = () => (
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/login-history" element={<LoginHistory />} />
               <Route path="/audit-logs" element={<AuditLogs />} />
+              <Route path="/graph" element={<Graph />} />
+              <Route path="/admin-graph" element={<AdminGraph />} />
               <Route path="/privacy" element={<Privacy />} />
             </Route>
             <Route path="*" element={<NotFound />} />

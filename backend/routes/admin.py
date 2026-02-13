@@ -66,6 +66,32 @@ async def list_users(
     }
 
 
+@router.get("/users/{user_id}/graph")
+async def get_user_graph(
+    user_id: int,
+    admin_user: User = Depends(require_admin),
+    db: Session = Depends(get_pii_db)
+):
+    """Fetch user's PII record metadata for graph visualization (admin only)"""
+    records = db.query(PIIRecord).filter(PIIRecord.user_id == user_id).all()
+    
+    return {
+        "records": [
+            {
+                "id": r.id,
+                "pii_type": r.pii_type,
+                "type_label": r.type_label,
+                "category": r.category,
+                "label": r.label,
+                "access_count": r.access_count,
+                "last_accessed": r.last_accessed.isoformat() + "Z" if r.last_accessed else None,
+                "created_at": r.created_at.isoformat() + "Z"
+            }
+            for r in records
+        ]
+    }
+
+
 @router.delete("/users/{user_id}")
 async def delete_user(
     user_id: int,
@@ -220,13 +246,22 @@ async def get_statistics(
         LoginAttempt.success == True
     ).scalar()
     
+    # Get record distribution by category
+    categories = db.query(
+        PIIRecord.category,
+        func.count(PIIRecord.id)
+    ).group_by(PIIRecord.category).all()
+    
+    category_stats = {cat: count for cat, count in categories}
+    
     return {
         "users": {
             "total": total_users,
             "active": active_users
         },
         "pii_records": {
-            "total": total_pii_records
+            "total": total_pii_records,
+            "by_category": category_stats
         },
         "login_attempts": {
             "total": total_login_attempts,

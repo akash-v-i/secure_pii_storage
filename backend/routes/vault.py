@@ -176,6 +176,22 @@ async def retrieve_pii(
                 detail="PII record not found"
             )
         
+        # Check for expiry (Crypto-Shred logic)
+        if pii_record.expiry_date and pii_record.expiry_date < datetime.utcnow():
+            # Shred the key for irreversible destruction
+            key_record = keys_db.query(FieldKey).filter(
+                FieldKey.key_id == pii_record.key_id
+            ).first()
+            if key_record and key_record.is_active:
+                key_record.is_active = False
+                keys_db.commit()
+                logger.warning(f"Crypto-shredded key {pii_record.key_id} for expired record {record_id}")
+            
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This record has expired and its encryption keys have been crypto-shredded for irreversible destruction."
+            )
+        
         # Get encryption key
         key_record = keys_db.query(FieldKey).filter(
             FieldKey.key_id == pii_record.key_id,

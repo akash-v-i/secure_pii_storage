@@ -115,6 +115,15 @@ export const Vault: React.FC = () => {
     return new Date(expiryDate) < new Date();
   };
 
+  const getRiskLevel = (count: number, type: string) => {
+    const sensitiveTypes = ['ssn', 'aadhaar', 'passport', 'pan', 'credit_card'];
+    const isSensitive = sensitiveTypes.includes(type.toLowerCase());
+
+    if (count > 5 || (isSensitive && count > 2)) return { label: 'High', color: 'bg-destructive/20 text-destructive border-destructive/30' };
+    if (count > 2 || (isSensitive && count > 0)) return { label: 'Medium', color: 'bg-amber-500/20 text-yellow-600 border-amber-500/30' };
+    return { label: 'Low', color: 'bg-green-500/20 text-green-600 border-green-500/30' };
+  };
+
   return (
     <div className="animate-fade-in">
       <PageHeader
@@ -162,6 +171,7 @@ export const Vault: React.FC = () => {
             <TableRow className="bg-muted/50">
               <TableHead className="font-semibold">PII Type</TableHead>
               <TableHead className="font-semibold">Value (Encrypted)</TableHead>
+              <TableHead className="font-semibold">Reveal Risk</TableHead>
               <TableHead className="font-semibold">Last Accessed</TableHead>
               <TableHead className="font-semibold">Expiry Date</TableHead>
               <TableHead className="font-semibold text-right">Actions</TableHead>
@@ -184,6 +194,16 @@ export const Vault: React.FC = () => {
                     revealDuration={5}
                     onReveal={() => handleReveal(record.id, record.typeLabel)}
                   />
+                </TableCell>
+                <TableCell>
+                  {(() => {
+                    const risk = getRiskLevel(record.accessCount, record.type);
+                    return (
+                      <Badge variant="outline" className={`font-semibold ${risk.color}`}>
+                        {risk.label}
+                      </Badge>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {record.lastAccessed}

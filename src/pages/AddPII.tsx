@@ -23,6 +23,7 @@ const PII_TYPES = [
   { value: 'driving_license', label: 'Driving License' },
   { value: 'passport', label: 'Passport Number' },
   { value: 'gstin', label: 'GSTIN' },
+  { value: 'medical_data', label: 'Medical Records/ID' },
   { value: 'other', label: 'Other' },
 ] as const;
 
@@ -156,6 +157,7 @@ export const AddPII: React.FC = () => {
       case 'driving_license': return 'DL14C1234567890';
       case 'passport': return 'Z1234567';
       case 'gstin': return '22AAAAA0000A1Z5';
+      case 'medical_data': return 'Policy #12345 or Medical History Summary';
       default: return 'Enter sensitive data';
     }
   };

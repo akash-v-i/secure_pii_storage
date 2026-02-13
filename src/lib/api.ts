@@ -97,12 +97,17 @@ export const authAPI = {
     });
     return response.data;
   },
+  getCaptcha: async () => {
+    const response = await api.get('/auth/captcha');
+    return response.data;
+  },
 
-  login: async (email: string, password: string, captcha: string) => {
+  login: async (email: string, password: string, captcha: string, captcha_id?: string) => {
     const response = await api.post('/auth/login', {
       email,
       password,
       captcha,
+      captcha_id,
     });
     return response.data;
   },
@@ -239,6 +244,11 @@ export const adminAPI = {
       params: { limit },
     });
     return response.data.audit_logs || [];
+  },
+
+  getUserGraph: async (userId: number) => {
+    const response = await api.get(`/api/admin/users/${userId}/graph`);
+    return response.data.records || [];
   },
 
   getStatistics: async () => {
