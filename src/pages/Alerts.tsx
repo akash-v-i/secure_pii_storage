@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { vaultAPI } from '@/lib/api';
 import { Bell, ShieldAlert, MapPin, UserX, Eye, Trash2, CheckCircle } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -7,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Alert {
   id: string;
@@ -61,6 +63,12 @@ const getSeverityStyles = (severity: string) => {
 };
 
 export const Alerts: React.FC = () => {
+  const { hasRole, isLoading: authLoading } = useAuth();
+
+  // Redirect auditors
+  if (!authLoading && hasRole(['auditor', 'admin'])) {
+    return <Navigate to="/dashboard" replace />;
+  }
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -153,7 +161,14 @@ export const Alerts: React.FC = () => {
                         {alert.severity}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
-                        {alert.timestamp}
+                        {new Date(alert.timestamp).toLocaleString('en-IN', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: true
+                        })}
                       </span>
                     </div>
                   </div>

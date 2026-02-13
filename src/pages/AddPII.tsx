@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { Plus, Lock, Shield, ArrowLeft } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { piiStore } from '@/stores/piiStore';
+import { useAuth } from '@/contexts/AuthContext';
 
 const PII_TYPES = [
   { value: 'aadhaar', label: 'Aadhaar Number' },
@@ -90,7 +91,13 @@ const piiSchema = z.object({
 type PIIFormData = z.infer<typeof piiSchema>;
 
 export const AddPII: React.FC = () => {
+  const { hasRole, isLoading } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect auditors away from Add PII
+  if (!isLoading && hasRole(['auditor', 'admin'])) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const {
     register,

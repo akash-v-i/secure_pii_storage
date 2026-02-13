@@ -6,7 +6,8 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import { jwtDecode } from 'jwt-decode';
 
 // API base URL - adjust if your backend runs on a different port
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8080';
+
 
 // Log the API URL in development to help debugging hosting issues
 if (import.meta.env.DEV) {
@@ -53,7 +54,8 @@ api.interceptors.response.use(
       console.error('1. Is the backend server running?');
       console.error('2. Is the VITE_API_URL correct?');
       console.error('3. Are there CORS blocking the request?');
-      return Promise.reject(new Error('Network error: Unable to connect to the server. Please check your connection and try again.'));
+      return Promise.reject(new Error(`Network error: Unable to connect to the server at ${API_BASE_URL}. Please check if the backend is running.`));
+
     }
 
     // Only redirect on 401 if we're not already on login page

@@ -8,7 +8,7 @@ from typing import List
 from pydantic import BaseModel
 
 from db.session import get_pii_db
-from db.pii_db import User, UserRole, LoginAttempt, PIIRecord
+from db.pii_db import User, UserRole, LoginAttempt, PIIRecord, AuditLog
 from routes.auth import get_current_user
 from utils.logger import setup_logger
 
@@ -22,6 +22,16 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"
+        )
+    return current_user
+
+
+def require_auditor_or_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Dependency to require auditor or admin role"""
+    if current_user.role not in [UserRole.ADMIN, UserRole.AUDITOR]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Auditor or Admin access required"
         )
     return current_user
 
@@ -47,8 +57,8 @@ async def list_users(
                 "role": user.User.role.value,
                 "is_active": user.User.is_active,
                 "is_locked": user.User.is_locked,
-                "last_login": user.User.last_login.isoformat() if user.User.last_login else None,
-                "created_at": user.User.created_at.isoformat(),
+                "last_login": user.User.last_login.isoformat() + "Z" if user.User.last_login else None,
+                "created_at": user.User.created_at.isoformat() + "Z",
                 "pii_count": user.pii_count
             }
             for user in users
@@ -145,32 +155,60 @@ async def update_user_role(
 @router.get("/audit")
 async def get_audit_logs(
     limit: int = 100,
-    admin_user: User = Depends(require_admin),
+    current_user: User = Depends(require_auditor_or_admin),
     db: Session = Depends(get_pii_db)
 ):
-    """Get security audit logs (admin only)"""
+    """Get security audit logs (admin and auditor)"""
+    # Get login attempts
     attempts = db.query(LoginAttempt).order_by(
         LoginAttempt.timestamp.desc()
     ).limit(limit).all()
     
+    # Get general audit logs
+    audit_entries = db.query(AuditLog).order_by(
+        AuditLog.timestamp.desc()
+    ).limit(limit).all()
+    
+    # Combine and convert
+    logs = []
+    
+    # Add login attempts to logs
+    for attempt in attempts:
+        logs.append({
+            "id": f"login-{attempt.id}",
+            "email": attempt.email,
+            "ip_address": attempt.ip_address,
+            "user_agent": attempt.user_agent,
+            "success": attempt.success,
+            "event_type": "LOGIN_SUCCESS" if attempt.success else "LOGIN_FAILED",
+            "description": "Successful authentication" if attempt.success else "Failed login attempt",
+            "timestamp": attempt.timestamp.isoformat() + "Z"
+        })
+        
+    # Add general audit entries to logs
+    for entry in audit_entries:
+        logs.append({
+            "id": f"audit-{entry.id}",
+            "email": entry.email or (entry.user.email if entry.user else "System"),
+            "ip_address": entry.ip_address,
+            "user_agent": entry.user_agent,
+            "success": True,
+            "event_type": entry.event_type,
+            "description": entry.description,
+            "timestamp": entry.timestamp.isoformat() + "Z"
+        })
+        
+    # Sort combined logs by timestamp desc
+    logs.sort(key=lambda x: x['timestamp'], reverse=True)
+    
     return {
-        "audit_logs": [
-            {
-                "id": attempt.id,
-                "email": attempt.email,
-                "ip_address": attempt.ip_address,
-                "user_agent": attempt.user_agent,
-                "success": attempt.success,
-                "timestamp": attempt.timestamp.isoformat()
-            }
-            for attempt in attempts
-        ]
+        "audit_logs": logs[:limit]
     }
 
 
 @router.get("/statistics")
 async def get_statistics(
-    admin_user: User = Depends(require_admin),
+    current_user: User = Depends(require_auditor_or_admin),
     db: Session = Depends(get_pii_db)
 ):
     """Get system statistics (admin only)"""

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { authAPI } from '@/lib/api';
-import { Clock, MapPin, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -12,15 +13,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 
 interface LoginEntry {
   id: string;
   timestamp: string;
-  ipAddress: string;
-  country: string;
-  city: string;
   status: 'success' | 'failed' | 'blocked';
-  device?: string;
+  ipAddress?: string;
+  location?: string;
+  activity?: string[];
 }
 
 
@@ -54,6 +56,12 @@ const getStatusConfig = (status: string) => {
 };
 
 export const LoginHistory: React.FC = () => {
+  const { hasRole, isLoading: authLoading } = useAuth();
+
+  // Redirect auditors
+  if (!authLoading && hasRole(['auditor', 'admin'])) {
+    return <Navigate to="/dashboard" replace />;
+  }
   const [history, setHistory] = useState<LoginEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -62,9 +70,20 @@ export const LoginHistory: React.FC = () => {
       try {
         const data = await authAPI.getLoginHistory();
         setHistory(data.map((entry: any) => ({
-          ...entry,
-          country: entry.location ? entry.location.split(',')[1]?.trim() || '' : 'Unknown',
-          city: entry.location ? entry.location.split(',')[0]?.trim() || '' : 'Unknown',
+          id: entry.id,
+          timestamp: new Date(entry.timestamp).toLocaleString('en-IN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+          }),
+          status: entry.status,
+          ipAddress: entry.ip_address,
+          location: entry.location,
+          activity: entry.activity || []
         })));
       } catch (error) {
         console.error("Failed to load history", error);
@@ -124,11 +143,11 @@ export const LoginHistory: React.FC = () => {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
-                <TableHead className="font-semibold">Timestamp</TableHead>
-                <TableHead className="font-semibold">IP Address</TableHead>
-                <TableHead className="font-semibold">Location</TableHead>
-                <TableHead className="font-semibold">Device</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
+                <TableHead className="font-semibold w-[220px]">Timestamp</TableHead>
+                <TableHead className="font-semibold w-[120px]">Status</TableHead>
+                <TableHead className="font-semibold w-[150px]">IP Address</TableHead>
+                <TableHead className="font-semibold w-[200px]">Location</TableHead>
+                <TableHead className="font-semibold">Activity in Session</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -138,28 +157,35 @@ export const LoginHistory: React.FC = () => {
 
                 return (
                   <TableRow key={entry.id} className="hover:bg-muted/30">
-                    <TableCell className="font-mono text-sm text-foreground">
+                    <TableCell className="font-mono text-[13px] text-foreground py-4">
                       {entry.timestamp}
                     </TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground">
-                      {entry.ipAddress}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm text-foreground">
-                          {entry.city}, {entry.country}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {entry.device}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={statusConfig.className}>
+                    <TableCell className="py-4">
+                      <Badge variant="outline" className={cn("px-2 py-0.5", statusConfig.className)}>
                         <StatusIcon className="w-3 h-3 mr-1" />
                         {statusConfig.label}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-[13px] text-muted-foreground py-4">
+                      {entry.ipAddress || '-'}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground py-4">
+                      {entry.location || '-'}
+                    </TableCell>
+                    <TableCell className="py-4">
+                      {entry.activity && entry.activity.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {entry.activity.map((act, i) => (
+                            <Badge key={i} variant="secondary" className="text-[10px] py-0 px-1.5 bg-muted/60 text-muted-foreground border-none font-medium">
+                              {act}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[13px] text-muted-foreground italic">
+                          {entry.status === 'success' ? 'No activity recorded' : '-'}
+                        </span>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

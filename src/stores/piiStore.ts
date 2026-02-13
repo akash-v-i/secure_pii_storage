@@ -27,7 +27,14 @@ const convertToPIIRecord = (apiRecord: any): PIIRecord => {
     label: apiRecord.label,
     notes: apiRecord.notes,
     lastAccessed: apiRecord.last_accessed
-      ? new Date(apiRecord.last_accessed).toISOString().replace('T', ' ').slice(0, 16)
+      ? new Date(apiRecord.last_accessed).toLocaleString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
       : '',
     expiryDate: apiRecord.expiry_date
       ? new Date(apiRecord.expiry_date).toISOString().split('T')[0]

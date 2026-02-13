@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { vaultAPI } from '@/lib/api';
 import { FileText, Upload, Download, Trash2, Lock, File, Image, FileType } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SecureFile {
   id: string;
@@ -33,6 +35,12 @@ const getFileIcon = (type: string) => {
 };
 
 export const SecureFiles: React.FC = () => {
+  const { hasRole, isLoading: authLoading } = useAuth();
+
+  // Redirect auditors
+  if (!authLoading && hasRole(['auditor', 'admin'])) {
+    return <Navigate to="/dashboard" replace />;
+  }
   const [files, setFiles] = useState<SecureFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDragging, setIsDragging] = useState(false);

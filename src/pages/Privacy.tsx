@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { vaultAPI } from '@/lib/api';
 import { Settings, Database, Clock, Download, Trash2, Shield, AlertTriangle } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -7,8 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const Privacy: React.FC = () => {
+  const { hasRole, isLoading: authLoading } = useAuth();
+
+  // Redirect auditors
+  if (!authLoading && hasRole(['auditor', 'admin'])) {
+    return <Navigate to="/dashboard" replace />;
+  }
   const [stats, setStats] = useState<any>({
     piiCount: 0,
     fileCount: 0,
@@ -226,12 +234,13 @@ export const Privacy: React.FC = () => {
               </p>
             </div>
             <div className="text-center p-6 bg-muted rounded-xl">
-              <Badge className="mb-3" variant="outline">AES-256</Badge>
-              <h4 className="font-medium text-foreground">Encryption Standard</h4>
+              <Badge className="mb-3" variant="outline">AES-256-GCM</Badge>
+              <h4 className="font-medium text-foreground">Secure Vaulting</h4>
               <p className="text-sm text-muted-foreground mt-2">
-                Military-grade encryption for all stored data
+                Unique encryption keys per record with envelope encryption standards.
               </p>
             </div>
+
           </div>
         </CardContent>
       </Card>

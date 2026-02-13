@@ -1,14 +1,14 @@
 """
 Vault routes - PII data operations (store, retrieve, update, delete)
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timedelta
 
 from db.session import get_pii_db, get_keys_db
-from db.pii_db import PIIRecord, User, PIIFile, LoginAttempt
+from db.pii_db import PIIRecord, User, PIIFile, LoginAttempt, AuditLog
 from db.key_db import FieldKey
 from services.crypto_service import crypto_service
 from routes.auth import get_current_user
@@ -19,6 +19,26 @@ from io import BytesIO
 
 router = APIRouter()
 logger = setup_logger()
+
+
+def log_audit_event(
+    db: Session,
+    user: User,
+    event_type: str,
+    description: str,
+    request: Request
+):
+    """Helper to log security events to the AuditLog table"""
+    audit_entry = AuditLog(
+        user_id=user.id,
+        email=user.email,
+        event_type=event_type,
+        description=description,
+        ip_address=request.client.host if request.client else "Unknown",
+        user_agent=request.headers.get("user-agent", "Unknown")
+    )
+    db.add(audit_entry)
+    db.commit()
 
 
 class PIIStoreRequest(BaseModel):
@@ -55,7 +75,8 @@ class PIIUpdateRequest(BaseModel):
 
 @router.post("/store")
 async def store_pii(
-    request: PIIStoreRequest,
+    pii_request: PIIStoreRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     pii_db: Session = Depends(get_pii_db),
     keys_db: Session = Depends(get_keys_db)
@@ -67,7 +88,7 @@ async def store_pii(
         dek, key_id = generate_dek()
         
         # Encrypt value with the DEK
-        encrypted_value, nonce, key_id = crypto_service.encrypt_pii(request.value, dek)
+        encrypted_value, nonce, key_id = crypto_service.encrypt_pii(pii_request.value, dek)
         
         # Wrap and store the DEK
         wrapped_key = crypto_service.wrap_dek(dek)
@@ -82,23 +103,23 @@ async def store_pii(
         
         # Parse expiry date
         expiry_date = None
-        if request.expiry_date:
+        if pii_request.expiry_date:
             try:
-                expiry_date = datetime.fromisoformat(request.expiry_date.replace('Z', '+00:00'))
+                expiry_date = datetime.fromisoformat(pii_request.expiry_date.replace('Z', '+00:00'))
             except:
                 pass
         
         # Create PII record
         pii_record = PIIRecord(
             user_id=current_user.id,
-            category=request.category,
-            pii_type=request.pii_type,
-            type_label=request.type_label,
+            category=pii_request.category,
+            pii_type=pii_request.pii_type,
+            type_label=pii_request.type_label,
             encrypted_value=encrypted_value,
             nonce=nonce,
             key_id=key_id,
-            label=request.label,
-            notes=request.notes,
+            label=pii_request.label,
+            notes=pii_request.notes,
             expiry_date=expiry_date
         )
         
@@ -106,7 +127,16 @@ async def store_pii(
         pii_db.commit()
         pii_db.refresh(pii_record)
         
-        logger.info(f"PII stored by user {current_user.id}: {request.type_label}")
+        logger.info(f"PII stored by user {current_user.id}: {pii_request.type_label}")
+        
+        # Log to audit database
+        log_audit_event(
+            pii_db, 
+            current_user, 
+            "PII_CREATE", 
+            f"Created new PII record: {pii_request.type_label} ({pii_request.label})", 
+            request
+        )
         
         return {
             "success": True,
@@ -127,6 +157,7 @@ async def store_pii(
 @router.get("/retrieve/{record_id}")
 async def retrieve_pii(
     record_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     pii_db: Session = Depends(get_pii_db),
     keys_db: Session = Depends(get_keys_db)
@@ -174,6 +205,15 @@ async def retrieve_pii(
         
         logger.info(f"PII retrieved by user {current_user.id}: record {record_id}")
         
+        # Log to audit database
+        log_audit_event(
+            pii_db, 
+            current_user, 
+            "PII_ACCESS", 
+            f"Accessed and decrypted PII record: {pii_record.type_label} ({pii_record.label})", 
+            request
+        )
+        
         return {
             **PIIResponse(
                 id=pii_record.id,
@@ -183,11 +223,11 @@ async def retrieve_pii(
                 value=decrypted_value,
                 label=pii_record.label,
                 notes=pii_record.notes,
-                expiry_date=pii_record.expiry_date.isoformat() if pii_record.expiry_date else None,
-                last_accessed=pii_record.last_accessed.isoformat() if pii_record.last_accessed else None,
+                expiry_date=pii_record.expiry_date.isoformat() + "Z" if pii_record.expiry_date else None,
+                last_accessed=pii_record.last_accessed.isoformat() + "Z" if pii_record.last_accessed else None,
                 access_count=pii_record.access_count,
-                created_at=pii_record.created_at.isoformat(),
-                updated_at=pii_record.updated_at.isoformat()
+                created_at=pii_record.created_at.isoformat() + "Z",
+                updated_at=pii_record.updated_at.isoformat() + "Z"
             ).dict()
         }
     
@@ -225,11 +265,11 @@ async def list_pii(
                 "value": masked_value,  # Masked for list view
                 "label": record.label,
                 "notes": record.notes,
-                "expiry_date": record.expiry_date.isoformat() if record.expiry_date else None,
-                "last_accessed": record.last_accessed.isoformat() if record.last_accessed else None,
+                "expiry_date": record.expiry_date.isoformat() + "Z" if record.expiry_date else None,
+                "last_accessed": record.last_accessed.isoformat() + "Z" if record.last_accessed else None,
                 "access_count": record.access_count,
-                "created_at": record.created_at.isoformat(),
-                "updated_at": record.updated_at.isoformat()
+                "created_at": record.created_at.isoformat() + "Z",
+                "updated_at": record.updated_at.isoformat() + "Z"
             })
         
         return {"records": result}
@@ -245,7 +285,8 @@ async def list_pii(
 @router.put("/update/{record_id}")
 async def update_pii(
     record_id: int,
-    request: PIIUpdateRequest,
+    pii_update: PIIUpdateRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     pii_db: Session = Depends(get_pii_db)
 ):
@@ -263,23 +304,32 @@ async def update_pii(
             )
         
         # Update fields
-        if request.label is not None:
-            record.label = request.label
-        if request.notes is not None:
-            record.notes = request.notes
-        if request.expiry_date is not None:
+        if pii_update.label is not None:
+            record.label = pii_update.label
+        if pii_update.notes is not None:
+            record.notes = pii_update.notes
+        if pii_update.expiry_date is not None:
             try:
-                record.expiry_date = datetime.fromisoformat(request.expiry_date.replace('Z', '+00:00'))
+                record.expiry_date = datetime.fromisoformat(pii_update.expiry_date.replace('Z', '+00:00'))
             except:
                 pass
         
         # If updating value, re-encrypt
-        if request.value is not None:
+        if pii_update.value is not None:
             # This would require key retrieval and re-encryption
             # Simplified for now - in production, properly handle key rotation
             pass
         
         pii_db.commit()
+        
+        # Log to audit database
+        log_audit_event(
+            pii_db, 
+            current_user, 
+            "SETTINGS_CHANGE", 
+            f"Updated PII record metadata: {record.type_label} ({record.label})", 
+            request
+        )
         
         return {"success": True, "message": "PII record updated"}
     
@@ -297,6 +347,7 @@ async def update_pii(
 @router.delete("/delete/{record_id}")
 async def delete_pii(
     record_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     pii_db: Session = Depends(get_pii_db)
 ):
@@ -313,10 +364,23 @@ async def delete_pii(
                 detail="PII record not found"
             )
         
+        # Store info for audit log before deletion
+        type_label = record.type_label
+        label = record.label
+        
         pii_db.delete(record)
         pii_db.commit()
         
         logger.info(f"PII deleted by user {current_user.id}: record {record_id}")
+        
+        # Log to audit database
+        log_audit_event(
+            pii_db, 
+            current_user, 
+            "PII_DELETE", 
+            f"Deleted PII record: {type_label} ({label})", 
+            request
+        )
         
         return {"success": True, "message": "PII record deleted"}
     
@@ -335,6 +399,7 @@ async def delete_pii(
 
 @router.post("/files/upload")
 async def upload_file(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     pii_db: Session = Depends(get_pii_db),
@@ -381,6 +446,15 @@ async def upload_file(
         pii_db.add(pii_file)
         pii_db.commit()
         pii_db.refresh(pii_file)
+        
+        # Log to audit database
+        log_audit_event(
+            pii_db, 
+            current_user, 
+            "FILE_UPLOAD", 
+            f"Uploaded and encrypted file: {file.filename} ({file_size} bytes)", 
+            request
+        )
         
         return {
             "success": True,
@@ -443,6 +517,7 @@ async def list_files(
 @router.get("/files/{file_id}/download")
 async def download_file(
     file_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     pii_db: Session = Depends(get_pii_db),
     keys_db: Session = Depends(get_keys_db)
@@ -477,6 +552,15 @@ async def download_file(
             dek
         )
         
+        # Log to audit database
+        log_audit_event(
+            pii_db, 
+            current_user, 
+            "FILE_DOWNLOAD", 
+            f"Decrypted and downloaded file: {file_record.filename}", 
+            request
+        )
+        
         # Stream response
         return StreamingResponse(
             BytesIO(decrypted_bytes),
@@ -499,6 +583,7 @@ async def download_file(
 @router.delete("/files/{file_id}")
 async def delete_file(
     file_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     pii_db: Session = Depends(get_pii_db)
 ):
@@ -512,8 +597,20 @@ async def delete_file(
         if not file_record:
             raise HTTPException(status_code=404, detail="File not found")
             
+        # Store info for audit
+        filename = file_record.filename
+        
         pii_db.delete(file_record)
         pii_db.commit()
+        
+        # Log to audit database
+        log_audit_event(
+            pii_db, 
+            current_user, 
+            "PII_DELETE", 
+            f"Deleted encrypted file: {filename}", 
+            request
+        )
         
         return {"success": True, "message": "File deleted"}
         
@@ -555,7 +652,7 @@ async def get_alerts(
                 "type": "expiry",
                 "title": "Record Expiring Soon",
                 "description": f"Your {record.type_label} labeled '{record.label}' expires in {days_left} days.",
-                "timestamp": record.created_at.isoformat(), # Use record creation or now?
+                "timestamp": record.created_at.isoformat() + "Z", # Use record creation or now?
                 "isRead": False,
                 "severity": "warning"
             })
@@ -574,7 +671,7 @@ async def get_alerts(
                 "type": "failed_login",
                 "title": "Recent Failed Logins",
                 "description": f"{len(failed_logins)} failed login attempts detected in the last 24 hours.",
-                "timestamp": failed_logins[0].timestamp.isoformat(),
+                "timestamp": failed_logins[0].timestamp.isoformat() + "Z",
                 "isRead": False,
                 "severity": "critical" if len(failed_logins) > 3 else "warning"
             })

@@ -1,5 +1,6 @@
 import React, { useSyncExternalStore, useEffect, useMemo, useState } from 'react';
-import { Lock, Clock, ShieldAlert, FileText, Activity, CheckCircle, Users, Trash2 } from 'lucide-react';
+import { Lock, Clock, ShieldAlert, FileText, Activity, CheckCircle, Users, Trash2, FileSearch } from 'lucide-react';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatCard } from '@/components/common/StatCard';
@@ -75,27 +76,148 @@ export const Dashboard: React.FC = () => {
 
   const formatLastLogin = () => {
     if (!user?.lastLogin) return 'N/A';
-    return new Intl.DateTimeFormat('en-US', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(user.lastLogin);
+    return new Date(user.lastLogin).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
   };
+
+  // -- AUDITOR logic --
+  const [systemStats, setSystemStats] = useState<any>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+  useEffect(() => {
+    if (hasRole(['admin', 'auditor'])) {
+      const loadStats = async () => {
+        try {
+          const stats = await adminAPI.getStatistics();
+          setSystemStats(stats);
+        } catch (error) {
+          console.error("Failed to load system stats", error);
+        } finally {
+          setLoadingStats(false);
+        }
+      };
+      loadStats();
+    }
+  }, [user]);
+
+
+  // --- RENDER AUDITOR DASHBOARD ---
+  if (hasRole(['auditor'])) {
+    return (
+      <div className="animate-fade-in">
+        <PageHeader
+          title="Compliance & Audit Overview"
+          description="Security monitoring and compliance statistics"
+          icon={Activity}
+        />
+
+        {loadingStats ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="p-6 h-32 animate-pulse bg-muted/50" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <StatCard
+              title="Total System Users"
+              value={systemStats?.users?.total || 0}
+              subtitle={`${systemStats?.users?.active || 0} currently active`}
+              icon={Users}
+            />
+            <StatCard
+              title="Global PII Records"
+              value={systemStats?.pii_records?.total || 0}
+              subtitle="Encrypted & Masked"
+              icon={Lock}
+              variant="secure"
+            />
+            <StatCard
+              title="Auth Success Rate"
+              value={systemStats?.login_attempts?.total ?
+                `${Math.round((systemStats.login_attempts.successful / systemStats.login_attempts.total) * 100)}%` : '0%'}
+              subtitle={`Of ${systemStats?.login_attempts?.total || 0} attempts`}
+              icon={CheckCircle}
+            />
+            <StatCard
+              title="Security Events"
+              value={systemStats?.login_attempts?.total - systemStats?.login_attempts?.successful || 0}
+              subtitle="Failed login attempts"
+              icon={ShieldAlert}
+              variant="warning"
+            />
+          </div>
+        )}
+
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Compliance Monitoring</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <Clock className="w-16 h-16 text-muted-foreground/20 mb-4" />
+            <h3 className="text-lg font-medium">Continuous Security Auditing</h3>
+            <p className="text-sm text-muted-foreground mt-2 max-w-sm mb-6">
+              As an Auditor, you have read-only access to global security logs and system-wide statistics to ensure regulatory compliance.
+            </p>
+            <Button asChild>
+              <a href="/audit-logs">Go to Global Audit Logs</a>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // --- RENDER ADMIN DASHBOARD ---
   if (hasRole(['admin'])) {
     return (
       <div className="animate-fade-in">
         <PageHeader
-          title={`Admin Dashboard`}
-          description="Manage users and view encryption statistics"
+          title={`Admin Control Center`}
+          description="System management and infrastructure oversight"
           icon={Users}
+          actions={
+            <Button variant="outline" asChild>
+              <a href="/audit-logs" className="gap-2">
+                <FileSearch className="w-4 h-4" />
+                Global Audit Logs
+              </a>
+            </Button>
+          }
         />
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <StatCard
+            title="Total Users"
+            value={systemStats?.users?.total || 0}
+            icon={Users}
+          />
+          <StatCard
+            title="Encrypted Records"
+            value={systemStats?.pii_records?.total || 0}
+            icon={Lock}
+            variant="secure"
+          />
+          <StatCard
+            title="Security Alerts"
+            value={systemStats?.login_attempts?.total - systemStats?.login_attempts?.successful || 0}
+            icon={ShieldAlert}
+            variant="warning"
+          />
+        </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Registered Users & PII Volume</CardTitle>
+            <CardTitle>User Directory & PII Volume</CardTitle>
           </CardHeader>
           <CardContent>
+
             <Table>
               <TableHeader>
                 <TableRow>
@@ -205,7 +327,14 @@ export const Dashboard: React.FC = () => {
         id: 'login',
         action: 'User Login',
         item: 'System Access',
-        time: new Date(user.lastLogin).toISOString().replace('T', ' ').slice(0, 16),
+        time: new Date(user.lastLogin).toLocaleString('en-IN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        }),
         type: 'create'
       });
     }

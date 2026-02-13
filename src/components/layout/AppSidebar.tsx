@@ -30,7 +30,8 @@ const navItems: NavItem[] = [
   { label: 'Secure Files', path: '/files', icon: <FileText size={20} />, roles: ['user'] },
   { label: 'Alerts', path: '/alerts', icon: <Bell size={20} />, roles: ['user'] },
   { label: 'Login History', path: '/login-history', icon: <Clock size={20} />, roles: ['user'] },
-  { label: 'Audit Logs', path: '/audit-logs', icon: <FileSearch size={20} />, roles: ['auditor'] },
+  { label: 'Audit Logs', path: '/audit-logs', icon: <FileSearch size={20} />, roles: ['admin', 'auditor'] },
+
   { label: 'Privacy', path: '/privacy', icon: <Settings size={20} />, roles: ['user'] },
 ];
 

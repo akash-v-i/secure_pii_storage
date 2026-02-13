@@ -9,7 +9,7 @@ from typing import Optional
 from datetime import datetime, timedelta
 
 from db.session import get_pii_db
-from db.pii_db import User, UserRole, LoginAttempt, PasswordResetOTP
+from db.pii_db import User, UserRole, LoginAttempt, PasswordResetOTP, AuditLog
 from utils.jwt_handler import verify_password, get_password_hash, create_access_token, decode_access_token
 from utils.validation import validate_email_format, validate_password_strength, sanitize_input
 from utils.logger import setup_logger
@@ -185,30 +185,30 @@ async def login(
 
     """User login endpoint"""
     try:
-        # Validate CAPTCHA (simple check for now - can integrate reCAPTCHA)
+        # Get client IP and location early
+        location = get_location_from_ip(client_ip)
+        email = sanitize_input(request.email.lower())
+        
+        # Initialize login attempt record early to catch all failures
+        login_attempt = LoginAttempt(
+            email=email,
+            ip_address=client_ip or "Unknown",
+            location=location or "Unknown",
+            success=False,
+            user_agent=fastapi_request.headers.get("user-agent", "Unknown")
+        )
+
+        # Validate CAPTCHA
         if request.captcha.lower() != "secure":
+            db.add(login_attempt)
+            db.commit()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid CAPTCHA"
             )
         
         # Find user
-        email = sanitize_input(request.email.lower())
         user = db.query(User).filter(User.email == email).first()
-        
-        # Get location
-        location = get_location_from_ip(client_ip)
-        
-        # Log login attempt
-        login_attempt = LoginAttempt(
-            email=email,
-            ip_address=client_ip,
-            location=location,
-            success=False,
-            user_agent=fastapi_request.headers.get("user-agent")
-        )
-
-
         
         if not user:
             db.add(login_attempt)
@@ -261,7 +261,7 @@ async def login(
                 "email": user.email,
                 "username": user.username,
                 "role": user.role.value,
-                "lastLogin": user.last_login.isoformat() if user.last_login else None
+                "lastLogin": user.last_login.isoformat() + "Z" if user.last_login else None
             }
         )
     
@@ -295,7 +295,7 @@ async def get_current_user_info(
         "email": current_user.email,
         "username": current_user.username,
         "role": current_user.role.value,
-        "lastLogin": current_user.last_login.isoformat() if current_user.last_login else None,
+        "lastLogin": current_user.last_login.isoformat() + "Z" if current_user.last_login else None,
         "isActive": current_user.is_active
     }
 
@@ -307,22 +307,44 @@ async def get_login_history(
 ):
     """Get login history for current user"""
     try:
+        # Get the 50 most recent attempts instead of 20
         attempts = db.query(LoginAttempt).filter(
             LoginAttempt.email == current_user.email
-        ).order_by(LoginAttempt.timestamp.desc()).limit(20).all()
+        ).order_by(LoginAttempt.timestamp.desc()).limit(50).all()
         
         result = []
-        for attempt in attempts:
+        for i, attempt in enumerate(attempts):
+            activity = []
+            if attempt.success:
+                # Find end time (next login or now)
+                end_time = datetime.utcnow()
+                if i > 0:
+                    end_time = attempts[i-1].timestamp
+                
+                # Fetch logs in this time window
+                try:
+                    session_logs = db.query(AuditLog).filter(
+                        AuditLog.email == current_user.email,
+                        AuditLog.timestamp >= attempt.timestamp,
+                        AuditLog.timestamp < end_time
+                    ).order_by(AuditLog.timestamp.asc()).all()
+                    activity = [log.description for log in session_logs]
+                except Exception as audit_err:
+                    logger.error(f"Error fetching audit logs for attempt: {str(audit_err)}")
+                    activity = ["Error loading activity"]
+
             result.append({
                 "id": str(attempt.id),
-                "timestamp": attempt.timestamp.isoformat(),
-                "ipAddress": attempt.ip_address,
-                "location": attempt.location,
+                "timestamp": attempt.timestamp.isoformat() + "Z",
                 "status": "success" if attempt.success else "failed",
-                "device": "Unknown" # Ideally parse user agent
+                "ip_address": attempt.ip_address,
+                "location": attempt.location,
+                "activity": activity
             })
             
         return {"history": result}
     except Exception as e:
         logger.error(f"Error fetching history: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to fetch history")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")

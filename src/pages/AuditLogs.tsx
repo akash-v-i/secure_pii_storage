@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
+import { adminAPI } from '@/lib/api';
 
 interface AuditLogEntry {
   id: string;
@@ -29,19 +30,8 @@ interface AuditLogEntry {
   user: string;
   timestamp: string;
   description: string;
-  ipAddress: string;
 }
 
-const mockAuditLogs: AuditLogEntry[] = [
-  { id: '1', eventType: 'PII_ACCESS', user: 'admin', timestamp: '2024-01-15 14:30:25', description: 'Viewed SSN record', ipAddress: '192.168.1.45' },
-  { id: '2', eventType: 'LOGIN_SUCCESS', user: 'user', timestamp: '2024-01-15 14:25:00', description: 'Successful authentication', ipAddress: '10.0.0.25' },
-  { id: '3', eventType: 'PII_CREATE', user: 'admin', timestamp: '2024-01-15 12:00:00', description: 'Created new email record', ipAddress: '192.168.1.45' },
-  { id: '4', eventType: 'FILE_UPLOAD', user: 'user', timestamp: '2024-01-15 11:45:00', description: 'Uploaded passport_scan.pdf', ipAddress: '10.0.0.25' },
-  { id: '5', eventType: 'LOGIN_FAILED', user: 'unknown', timestamp: '2024-01-15 10:30:00', description: 'Failed login attempt', ipAddress: '172.16.0.100' },
-  { id: '6', eventType: 'PII_DELETE', user: 'admin', timestamp: '2024-01-14 16:20:00', description: 'Deleted expired credit card record', ipAddress: '192.168.1.45' },
-  { id: '7', eventType: 'SETTINGS_CHANGE', user: 'admin', timestamp: '2024-01-14 14:00:00', description: 'Updated retention policy', ipAddress: '192.168.1.45' },
-  { id: '8', eventType: 'FILE_DOWNLOAD', user: 'auditor', timestamp: '2024-01-14 10:15:00', description: 'Downloaded tax_return_2023.pdf', ipAddress: '192.168.1.50' },
-];
 
 const getEventTypeBadge = (eventType: string) => {
   const configs: Record<string, { label: string; className: string }> = {
@@ -56,7 +46,7 @@ const getEventTypeBadge = (eventType: string) => {
   };
 
   const config = configs[eventType] || { label: eventType, className: 'bg-muted text-muted-foreground' };
-  
+
   return (
     <Badge variant="outline" className={config.className}>
       {config.label}
@@ -66,6 +56,8 @@ const getEventTypeBadge = (eventType: string) => {
 
 export const AuditLogs: React.FC = () => {
   const { hasRole } = useAuth();
+  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [eventFilter, setEventFilter] = useState('all');
 
@@ -74,12 +66,65 @@ export const AuditLogs: React.FC = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const filteredLogs = mockAuditLogs.filter(log => {
+  // Fetch logs on mount
+  React.useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        const data = await adminAPI.getAuditLogs();
+        // Map backend data to frontend log format
+        setLogs(data.map((log: any) => ({
+          id: log.id.toString(),
+          eventType: log.event_type || (log.success ? 'LOGIN_SUCCESS' : 'LOGIN_FAILED'),
+          user: log.email,
+          timestamp: new Date(log.timestamp).toLocaleString('en-IN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+          }),
+          description: log.description || (log.success ? 'Successful authentication' : 'Failed login attempt')
+        })));
+      } catch (error) {
+        console.error('Failed to load audit logs', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLogs();
+  }, []);
+
+  const filteredLogs = logs.filter(log => {
     const matchesSearch = log.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         log.user.toLowerCase().includes(searchQuery.toLowerCase());
+      log.user.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = eventFilter === 'all' || log.eventType === eventFilter;
     return matchesSearch && matchesFilter;
   });
+
+
+  const handleExport = () => {
+    if (filteredLogs.length === 0) return;
+
+    const headers = ['Event Type', 'User', 'Timestamp', 'Description'];
+    const rows = filteredLogs.map(log => [
+      log.eventType,
+      log.user,
+      log.timestamp.replace(',', ''),
+      `"${log.description.replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `audit-logs-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="animate-fade-in">
@@ -88,7 +133,12 @@ export const AuditLogs: React.FC = () => {
         description="Immutable record of all security-relevant events"
         icon={FileSearch}
         actions={
-          <Button variant="outline" className="gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleExport}
+            disabled={filteredLogs.length === 0}
+          >
             <Download className="w-4 h-4" />
             Export Logs
           </Button>
@@ -99,7 +149,7 @@ export const AuditLogs: React.FC = () => {
       <div className="bg-muted border border-border rounded-lg p-4 mb-6 flex items-center gap-3">
         <Shield className="w-5 h-5 text-muted-foreground flex-shrink-0" />
         <p className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Append-Only Log:</span> These records are immutable and cannot be modified or deleted. 
+          <span className="font-medium text-foreground">Append-Only Log:</span> These records are immutable and cannot be modified or deleted.
           All entries are cryptographically signed and tamper-evident.
         </p>
       </div>
@@ -137,28 +187,24 @@ export const AuditLogs: React.FC = () => {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
-                <TableHead className="font-semibold">Event Type</TableHead>
-                <TableHead className="font-semibold">User</TableHead>
-                <TableHead className="font-semibold">Timestamp</TableHead>
+                <TableHead className="font-semibold w-[150px]">Event Type</TableHead>
+                <TableHead className="font-semibold w-[220px]">User</TableHead>
+                <TableHead className="font-semibold w-[240px]">Timestamp</TableHead>
                 <TableHead className="font-semibold">Description</TableHead>
-                <TableHead className="font-semibold">IP Address</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredLogs.map((log) => (
                 <TableRow key={log.id} className="hover:bg-muted/30">
-                  <TableCell>{getEventTypeBadge(log.eventType)}</TableCell>
-                  <TableCell className="font-medium text-foreground">
-                    {log.user}
+                  <TableCell className="py-4 w-[150px]">{getEventTypeBadge(log.eventType)}</TableCell>
+                  <TableCell className="font-medium text-foreground py-4 w-[220px]">
+                    <div className="truncate max-w-[200px]" title={log.user}>{log.user}</div>
                   </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground">
+                  <TableCell className="font-mono text-[13px] text-muted-foreground py-4 w-[240px]">
                     {log.timestamp}
                   </TableCell>
-                  <TableCell className="text-foreground">
+                  <TableCell className="text-foreground py-4">
                     {log.description}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground">
-                    {log.ipAddress}
                   </TableCell>
                 </TableRow>
               ))}

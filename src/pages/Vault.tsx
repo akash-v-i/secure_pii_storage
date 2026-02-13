@@ -24,14 +24,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { piiStore, PIIRecord } from '@/stores/piiStore';
 import { useAuth } from '@/contexts/AuthContext';
 
 export const Vault: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, hasRole, isLoading: authLoading } = useAuth();
+
+  // Redirect auditors away from Vault
+  if (!authLoading && hasRole(['auditor', 'admin'])) {
+    return <Navigate to="/dashboard" replace />;
+  }
   const records = useSyncExternalStore(piiStore.subscribe, piiStore.getRecords, piiStore.getRecords);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -145,7 +150,7 @@ export const Vault: React.FC = () => {
       <div className="bg-secure-muted border border-secure/20 rounded-lg p-4 mb-6 flex items-center gap-3">
         <Lock className="w-5 h-5 text-secure flex-shrink-0" />
         <p className="text-sm text-foreground">
-          <span className="font-medium">Encryption Active:</span> All values are encrypted at rest. 
+          <span className="font-medium">Encryption Active:</span> All values are encrypted at rest.
           Clicking reveal will temporarily decrypt for 5 seconds and log the access.
         </p>
       </div>
@@ -190,8 +195,8 @@ export const Vault: React.FC = () => {
                         isExpired(record.expiryDate)
                           ? 'destructive'
                           : isExpiringSoon(record.expiryDate)
-                          ? 'outline'
-                          : 'secondary'
+                            ? 'outline'
+                            : 'secondary'
                       }
                       className={
                         isExpiringSoon(record.expiryDate) && !isExpired(record.expiryDate)
@@ -216,7 +221,7 @@ export const Vault: React.FC = () => {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete PII Record</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Are you sure you want to permanently delete this encrypted record? 
+                          Are you sure you want to permanently delete this encrypted record?
                           This action cannot be undone and will be logged in the audit trail.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
@@ -236,7 +241,7 @@ export const Vault: React.FC = () => {
             ))}
           </TableBody>
         </Table>
-        
+
         {isLoading ? (
           <div className="text-center py-12">
             <Loader2 className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4 animate-spin" />

@@ -75,9 +75,24 @@ def create_default_admin():
             db.add(admin)
             db.commit()
             print("[OK] Default admin user created: admin@vault.com / Admin123!")
+        # Check if auditor exists
+        auditor = db.query(User).filter(User.email == "auditor@vault.com").first()
+        if not auditor:
+            auditor = User(
+                email="auditor@vault.com",
+                username="Security Auditor",
+                hashed_password=get_password_hash("Audit123!"),
+                role=UserRole.AUDITOR,
+                is_active=True
+            )
+            db.add(auditor)
+            db.commit()
+            print("[OK] Default auditor user created: auditor@vault.com / Audit123!")
         else:
-            print("[OK] Admin user already exists")
+            print("[OK] Auditor user already exists")
+
     except Exception as e:
+
         print(f"[ERROR] Error creating admin: {e}")
         db.rollback()
     finally:
