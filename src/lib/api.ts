@@ -88,12 +88,13 @@ export const isTokenExpired = (token: string): boolean => {
 
 // Auth API
 export const authAPI = {
-  register: async (email: string, password: string, username: string, captcha?: string) => {
+  register: async (email: string, password: string, username: string, captcha: string, captcha_id?: string) => {
     const response = await api.post('/auth/register', {
       email,
       password,
       username,
       captcha,
+      captcha_id,
     });
     return response.data;
   },

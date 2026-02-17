@@ -35,9 +35,7 @@ export const Login: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!isRegisterMode) {
-      refreshCaptcha();
-    }
+    refreshCaptcha();
   }, [isRegisterMode]);
 
   const validateEmail = (email: string): boolean => {
@@ -118,7 +116,7 @@ export const Login: React.FC = () => {
 
     try {
       if (isRegisterMode) {
-        const result = await register(email, password, name);
+        const result = await register(email, password, name, captcha, captchaData.id || undefined);
         if (result.success) {
           setSuccess('Account created successfully! You can now log in.');
           setIsRegisterMode(false);
@@ -127,6 +125,7 @@ export const Login: React.FC = () => {
           setCaptcha('');
         } else {
           setError(result.message || 'Registration failed. Please try again.');
+          refreshCaptcha();
         }
       } else {
         const success = await login(email, password, captcha, captchaData.id || undefined);
@@ -311,40 +310,38 @@ export const Login: React.FC = () => {
                 </div>
               )}
 
-              {!isRegisterMode && (
-                <div className="space-y-2">
-                  <Label htmlFor="captcha">Security Verification</Label>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 bg-muted rounded-lg px-4 py-3 font-mono text-lg tracking-widest text-center select-none relative overflow-hidden group">
-                      <div className="absolute inset-0 opacity-10 pointer-events-none select-none">
-                        <div className="absolute top-1/2 left-0 w-full h-[1px] bg-foreground -rotate-6" />
-                        <div className="absolute top-1/3 left-0 w-full h-[1px] bg-foreground rotate-3" />
-                      </div>
-                      <span className="relative z-10">{captchaData.text}</span>
+              <div className="space-y-2">
+                <Label htmlFor="captcha">Security Verification</Label>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 bg-muted rounded-lg px-4 py-3 font-mono text-lg tracking-widest text-center select-none relative overflow-hidden group">
+                    <div className="absolute inset-0 opacity-10 pointer-events-none select-none">
+                      <div className="absolute top-1/2 left-0 w-full h-[1px] bg-foreground -rotate-6" />
+                      <div className="absolute top-1/3 left-0 w-full h-[1px] bg-foreground rotate-3" />
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        refreshCaptcha();
-                      }}
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </Button>
+                    <span className="relative z-10">{captchaData.text}</span>
                   </div>
-                  <Input
-                    id="captcha"
-                    type="text"
-                    placeholder="Type the word above"
-                    value={captcha}
-                    onChange={(e) => setCaptcha(e.target.value)}
-                    required
-                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      refreshCaptcha();
+                    }}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
                 </div>
-              )}
+                <Input
+                  id="captcha"
+                  type="text"
+                  placeholder="Type the word above"
+                  value={captcha}
+                  onChange={(e) => setCaptcha(e.target.value)}
+                  required
+                />
+              </div>
 
               <Button
                 type="submit"

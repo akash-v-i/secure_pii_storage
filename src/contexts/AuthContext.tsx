@@ -12,7 +12,7 @@ interface DecodedToken {
 interface AuthContextType extends AuthState {
   login: (email: string, password: string, captcha: string, captcha_id?: string) => Promise<boolean>;
   logout: () => void;
-  register: (email: string, password: string, name: string) => Promise<{ success: boolean; message?: string }>;
+  register: (email: string, password: string, name: string, captcha: string, captcha_id?: string) => Promise<{ success: boolean; message?: string }>;
   hasRole: (roles: UserRole[]) => boolean;
   isLoading: boolean;
 }
@@ -70,10 +70,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const register = async (
     email: string,
     password: string,
-    name: string
+    name: string,
+    captcha: string,
+    captcha_id?: string
   ): Promise<{ success: boolean; message?: string }> => {
     try {
-      const response = await authAPI.register(email, password, name);
+      const response = await authAPI.register(email, password, name, captcha, captcha_id);
 
       if (response.success && response.access_token) {
         // Store token
