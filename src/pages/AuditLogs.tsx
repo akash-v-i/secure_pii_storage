@@ -61,11 +61,6 @@ export const AuditLogs: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [eventFilter, setEventFilter] = useState('all');
 
-  // Role-based access check
-  if (!hasRole(['admin', 'auditor'])) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   // Fetch logs on mount
   React.useEffect(() => {
     const fetchLogs = async () => {
@@ -95,6 +90,11 @@ export const AuditLogs: React.FC = () => {
     };
     fetchLogs();
   }, []);
+
+  // Role-based access check
+  if (!hasRole(['admin', 'auditor'])) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const filteredLogs = logs.filter(log => {
     const matchesSearch = log.description.toLowerCase().includes(searchQuery.toLowerCase()) ||

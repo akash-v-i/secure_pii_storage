@@ -65,10 +65,6 @@ const getSeverityStyles = (severity: string) => {
 export const Alerts: React.FC = () => {
   const { hasRole, isLoading: authLoading } = useAuth();
 
-  // Redirect auditors
-  if (!authLoading && hasRole(['auditor', 'admin'])) {
-    return <Navigate to="/dashboard" replace />;
-  }
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -86,6 +82,13 @@ export const Alerts: React.FC = () => {
     };
     fetchAlerts();
   }, []);
+
+  // Redirect auditors
+  if (!authLoading && hasRole(['auditor', 'admin'])) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+
 
   const unreadCount = alerts.filter(a => !a.isRead).length;
 

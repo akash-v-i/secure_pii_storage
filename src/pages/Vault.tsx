@@ -33,10 +33,6 @@ export const Vault: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, hasRole, isLoading: authLoading } = useAuth();
 
-  // Redirect auditors away from Vault
-  if (!authLoading && hasRole(['auditor', 'admin'])) {
-    return <Navigate to="/dashboard" replace />;
-  }
   const records = useSyncExternalStore(piiStore.subscribe, piiStore.getRecords, piiStore.getRecords);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -70,6 +66,12 @@ export const Vault: React.FC = () => {
     };
     loadRecords();
   }, [authLoading, isAuthenticated]);
+
+  // Redirect auditors away from Vault
+  if (!authLoading && hasRole(['auditor', 'admin'])) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
 
   const filteredRecords = records.filter(record =>
     record.typeLabel.toLowerCase().includes(searchQuery.toLowerCase()) ||

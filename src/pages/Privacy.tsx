@@ -13,10 +13,6 @@ import { useAuth } from '@/contexts/AuthContext';
 export const Privacy: React.FC = () => {
   const { hasRole, isLoading: authLoading } = useAuth();
 
-  // Redirect auditors
-  if (!authLoading && hasRole(['auditor', 'admin'])) {
-    return <Navigate to="/dashboard" replace />;
-  }
   const [stats, setStats] = useState<any>({
     piiCount: 0,
     fileCount: 0,
@@ -37,6 +33,12 @@ export const Privacy: React.FC = () => {
     };
     loadStats();
   }, []);
+
+  // Redirect auditors
+  if (!authLoading && hasRole(['auditor', 'admin'])) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 B';

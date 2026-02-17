@@ -52,9 +52,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             },
             isAuthenticated: true,
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           // Token invalid or expired - log for debugging
-          console.error('Failed to get current user:', error.response?.status, error.message);
+          const apiError = error as { response?: { status?: number }, message?: string };
+          console.error('Failed to get current user:', apiError.response?.status, apiError.message);
           localStorage.removeItem('access_token');
           localStorage.removeItem('user');
         }
@@ -99,9 +100,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       return { success: false, message: response.message || 'Registration failed' };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { detail?: string } }, message?: string };
       const message =
-        error.response?.data?.detail || error.message || 'Registration failed. Please try again.';
+        apiError.response?.data?.detail || apiError.message || 'Registration failed. Please try again.';
       return { success: false, message };
     }
   };
@@ -126,7 +128,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
       return false;
     }

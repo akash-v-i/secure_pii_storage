@@ -37,10 +37,6 @@ const getFileIcon = (type: string) => {
 export const SecureFiles: React.FC = () => {
   const { hasRole, isLoading: authLoading } = useAuth();
 
-  // Redirect auditors
-  if (!authLoading && hasRole(['auditor', 'admin'])) {
-    return <Navigate to="/dashboard" replace />;
-  }
   const [files, setFiles] = useState<SecureFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
@@ -98,6 +94,12 @@ export const SecureFiles: React.FC = () => {
       fileInputRef.current.value = '';
     }
   }, []);
+
+  // Redirect auditors
+  if (!authLoading && hasRole(['auditor', 'admin'])) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
 
   const processFiles = async (fileList: File[]) => {
     if (fileList.length === 0) return;

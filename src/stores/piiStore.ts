@@ -15,11 +15,23 @@ export interface PIIRecord {
 
 // Cache for records (to avoid constant API calls)
 let piiRecordsCache: PIIRecord[] = [];
-let listeners: Set<() => void> = new Set();
+const listeners: Set<() => void> = new Set();
 let isLoaded = false;
 
+interface APIPIIRecord {
+  id: string | number;
+  pii_type: string;
+  type_label: string;
+  value?: string;
+  label: string;
+  notes?: string;
+  last_accessed?: string;
+  expiry_date?: string;
+  access_count?: number;
+}
+
 // Convert API response to PIIRecord format
-const convertToPIIRecord = (apiRecord: any): PIIRecord => {
+const convertToPIIRecord = (apiRecord: APIPIIRecord): PIIRecord => {
   return {
     id: apiRecord.id,
     type: apiRecord.pii_type,
@@ -102,7 +114,15 @@ export const piiStore = {
 
       // Find the newly added record
       const newRecord = piiRecordsCache.find(r => r.id === response.id);
-      return newRecord || convertToPIIRecord({ id: response.id, ...record });
+      return newRecord || convertToPIIRecord({
+        id: response.id,
+        pii_type: record.type,
+        type_label: record.typeLabel,
+        value: record.value,
+        label: record.label,
+        notes: record.notes,
+        expiry_date: record.expiryDate
+      });
     } catch (error) {
       console.error('Failed to add PII record:', error);
       throw error;

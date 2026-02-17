@@ -55,7 +55,7 @@ const piiSchema = z.object({
       break;
     case 'mobile':
       // 10 digits, optional +91 prefix
-      isValid = /^(\+91[\-\s]?)?[6-9]\d{9}$/.test(cleanValue);
+      isValid = /^(\+91[- ]?)?[6-9]\d{9}$/.test(cleanValue);
       message = 'Invalid Mobile Number. Expected 10 digits.';
       break;
     case 'voter_id':
@@ -65,7 +65,7 @@ const piiSchema = z.object({
       break;
     case 'driving_license':
       // 13-15 alphanumeric
-      isValid = /^[A-Z0-9\/\-\s]{13,15}$/.test(cleanValue);
+      isValid = /^[A-Z0-9/\- ]{13,15}$/.test(cleanValue);
       message = 'Invalid Driving License format. Expected 13-15 characters.';
       break;
     case 'passport':
@@ -95,11 +95,6 @@ export const AddPII: React.FC = () => {
   const { hasRole, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect auditors away from Add PII
-  if (!isLoading && hasRole(['auditor', 'admin'])) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   const {
     register,
     handleSubmit,
@@ -117,6 +112,11 @@ export const AddPII: React.FC = () => {
       expiryDate: '',
     },
   });
+
+  // Redirect auditors away from Add PII
+  if (!isLoading && hasRole(['auditor', 'admin'])) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const selectedType = watch('piiType');
 
@@ -141,9 +141,10 @@ export const AddPII: React.FC = () => {
 
       reset();
       navigate('/vault');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { detail?: string } } };
       toast.error('Failed to store PII record', {
-        description: error.response?.data?.detail || 'Please try again.',
+        description: axiosError.response?.data?.detail || 'Please try again.',
       });
     }
   };

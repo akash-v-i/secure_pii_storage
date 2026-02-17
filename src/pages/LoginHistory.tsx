@@ -58,10 +58,6 @@ const getStatusConfig = (status: string) => {
 export const LoginHistory: React.FC = () => {
   const { hasRole, isLoading: authLoading } = useAuth();
 
-  // Redirect auditors
-  if (!authLoading && hasRole(['auditor', 'admin'])) {
-    return <Navigate to="/dashboard" replace />;
-  }
   const [history, setHistory] = useState<LoginEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -93,6 +89,12 @@ export const LoginHistory: React.FC = () => {
     };
     fetchHistory();
   }, []);
+
+  // Redirect auditors
+  if (!authLoading && hasRole(['auditor', 'admin'])) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
 
   const successCount = history.filter(l => l.status === 'success').length;
   const failedCount = history.filter(l => l.status === 'failed').length;

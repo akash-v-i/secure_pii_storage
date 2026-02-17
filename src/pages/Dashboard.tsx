@@ -89,6 +89,62 @@ export const Dashboard: React.FC = () => {
   // -- AUDITOR logic --
   const [systemStats, setSystemStats] = useState<any>(null);
   const [loadingStats, setLoadingStats] = useState(true);
+
+  // Derived Statistics
+  const totalEncrypted = records.length;
+
+  // Calculate expiry stats
+  const expiringSoonCount = useMemo(() => {
+    const today = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(today.getDate() + 30);
+
+    return records.filter(r => {
+      if (!r.expiryDate) return false;
+      const exp = new Date(r.expiryDate);
+      return exp > today && exp <= thirtyDaysFromNow;
+    }).length;
+  }, [records]);
+
+  // Generate "Recent Activity" from actual PII records (using lastAccessed or created timestamps if available)
+  const recentActivity = useMemo(() => {
+    const activityList = [];
+
+    // Add "accessed recently" items
+    const recentlyAccessed = [...records]
+      .filter(r => r.lastAccessed)
+      .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime())
+      .slice(0, 3)
+      .map(r => ({
+        id: `acc - ${r.id} `,
+        action: 'PII Record Accessed',
+        item: r.typeLabel, // e.g., "Credit Card"
+        time: r.lastAccessed, // e.g. "2024-03-10 10:00"
+        type: 'access'
+      }));
+
+    activityList.push(...recentlyAccessed);
+
+    if (activityList.length < 4 && user?.lastLogin) {
+      activityList.push({
+        id: 'login',
+        action: 'User Login',
+        item: 'System Access',
+        time: new Date(user.lastLogin).toLocaleString('en-IN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        }),
+        type: 'create'
+      });
+    }
+
+    return activityList;
+  }, [records, user]);
+
   useEffect(() => {
     if (hasRole(['admin', 'auditor'])) {
       const loadStats = async () => {
@@ -283,64 +339,7 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  // --- RENDER USER DASHBOARD (Existing) ---
-  // Derived Statistics
-  const totalEncrypted = records.length;
 
-  // Calculate expiry stats
-  const expiringSoonCount = useMemo(() => {
-    const today = new Date();
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(today.getDate() + 30);
-
-    return records.filter(r => {
-      if (!r.expiryDate) return false;
-      const exp = new Date(r.expiryDate);
-      return exp > today && exp <= thirtyDaysFromNow;
-    }).length;
-  }, [records]);
-
-  // Generate "Recent Activity" from actual PII records (using lastAccessed or created timestamps if available)
-  // Note: Real audit logs would come from a dedicated API, but we can approximate "recent PII usage" here
-  const recentActivity = useMemo(() => {
-    const activityList = [];
-
-    // Add "accessed recently" items
-    const recentlyAccessed = [...records]
-      .filter(r => r.lastAccessed)
-      .sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime())
-      .slice(0, 3)
-      .map(r => ({
-        id: `acc - ${r.id} `,
-        action: 'PII Record Accessed',
-        item: r.typeLabel, // e.g., "Credit Card"
-        time: r.lastAccessed, // e.g. "2024-03-10 10:00"
-        type: 'access'
-      }));
-
-    activityList.push(...recentlyAccessed);
-
-    // If we had a "created_at" field on PIIRecord in frontend store, we could show "Created" events too.
-    // For now, let's fill with some system events if list is short
-    if (activityList.length < 4 && user?.lastLogin) {
-      activityList.push({
-        id: 'login',
-        action: 'User Login',
-        item: 'System Access',
-        time: new Date(user.lastLogin).toLocaleString('en-IN', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        }),
-        type: 'create'
-      });
-    }
-
-    return activityList;
-  }, [records, user]);
 
   return (
     <div className="animate-fade-in">
