@@ -6,7 +6,7 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import { jwtDecode } from 'jwt-decode';
 
 // API base URL - adjust if your backend runs on a different port
-const API_BASE_URL = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8080');
+const API_BASE_URL = 'https://journals-car-mainstream-xbox.trycloudflare.com';
 
 // Log the API URL in development to help debugging hosting issues
 if (import.meta.env.DEV) {
