@@ -14,6 +14,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -35,6 +44,7 @@ export const Vault: React.FC = () => {
 
   const records = useSyncExternalStore(piiStore.subscribe, piiStore.getRecords, piiStore.getRecords);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
 
   // Load records only after authentication is ready
@@ -73,10 +83,16 @@ export const Vault: React.FC = () => {
   }
 
 
-  const filteredRecords = records.filter(record =>
-    record.typeLabel.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    record.label.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredRecords = records.filter(record => {
+    const matchesSearch =
+      (record.typeLabel?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (record.label?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (record.value?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+
+    const matchesFilter = filterType === 'all' || record.type === filterType;
+
+    return matchesSearch && matchesFilter;
+  });
 
   const handleDelete = async (id: string | number) => {
     try {
@@ -151,10 +167,28 @@ export const Vault: React.FC = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="gap-2">
-          <Filter className="w-4 h-4" />
-          Filter
-        </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Filter className="w-4 h-4" />
+              {filterType === 'all' ? 'Filter' : `Type: ${filterType}`}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56">
+            <DropdownMenuLabel>Filter by PII Type</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuRadioGroup value={filterType} onValueChange={setFilterType}>
+              <DropdownMenuRadioItem value="all">All Types</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="ssn">SSN</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="credit_card">Credit Card</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="passport">Passport</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="bank_account">Bank Account</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="aadhaar">Aadhaar</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="pan">PAN Card</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Security Notice */}

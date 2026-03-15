@@ -16,6 +16,7 @@ import AuditLogs from "./pages/AuditLogs";
 import Privacy from "./pages/Privacy";
 import Graph from "./pages/Graph";
 import AdminGraph from "./pages/AdminGraph";
+import DeletionRequests from "./pages/DeletionRequests";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/audit-logs" element={<AuditLogs />} />
               <Route path="/graph" element={<Graph />} />
               <Route path="/admin-graph" element={<AdminGraph />} />
+              <Route path="/admin/deletion-requests" element={<DeletionRequests />} />
               <Route path="/privacy" element={<Privacy />} />
             </Route>
             <Route path="*" element={<NotFound />} />

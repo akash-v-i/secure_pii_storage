@@ -11,7 +11,8 @@ import {
   Settings,
   Shield,
   LogOut,
-  Share2
+  Share2,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
   { label: 'Relationship Graph', path: '/graph', icon: <Share2 size={20} />, roles: ['user'] },
   { label: 'Admin Graph', path: '/admin-graph', icon: <Share2 size={20} />, roles: ['admin'] },
   { label: 'Audit Logs', path: '/audit-logs', icon: <FileSearch size={20} />, roles: ['admin', 'auditor'] },
+  { label: 'Deletion Requests', path: '/admin/deletion-requests', icon: <Trash2 size={20} />, roles: ['admin'] },
 
   { label: 'Privacy', path: '/privacy', icon: <Settings size={20} />, roles: ['user'] },
 ];

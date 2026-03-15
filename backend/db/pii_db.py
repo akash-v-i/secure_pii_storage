@@ -18,6 +18,13 @@ class UserRole(str, enum.Enum):
     AUDITOR = "auditor"
 
 
+class DeletionRequestStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    COMPLETED = "completed"
+
+
 class User(PIIDeclarativeBase):
     """User model for authentication and authorization"""
     __tablename__ = "users"
@@ -133,3 +140,17 @@ class PasswordResetOTP(PIIDeclarativeBase):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     user = relationship("User")
+
+
+class DeletionRequest(PIIDeclarativeBase):
+    """Data deletion requests"""
+    __tablename__ = "deletion_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    reason = Column(Text, nullable=False)
+    status = Column(SQLEnum(DeletionRequestStatus), default=DeletionRequestStatus.PENDING, nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    user = relationship("User", backref="deletion_requests")

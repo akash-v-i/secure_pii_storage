@@ -231,10 +231,13 @@
   }
 
   @keyframes scan {
-    0%, 100% {
+
+    0%,
+    100% {
       transform: translateY(0);
       opacity: 0;
     }
+
     50% {
       transform: translateY(240px);
       opacity: 1;
@@ -245,6 +248,7 @@
     from {
       transform: rotate(0deg);
     }
+
     to {
       transform: rotate(360deg);
     }

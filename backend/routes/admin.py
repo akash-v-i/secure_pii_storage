@@ -8,7 +8,7 @@ from typing import List
 from pydantic import BaseModel
 
 from db.session import get_pii_db
-from db.pii_db import User, UserRole, LoginAttempt, PIIRecord, AuditLog
+from db.pii_db import User, UserRole, LoginAttempt, PIIRecord, AuditLog, DeletionRequest, DeletionRequestStatus
 from routes.auth import get_current_user
 from utils.logger import setup_logger
 
@@ -268,3 +268,46 @@ async def get_statistics(
             "successful": successful_logins
         }
     }
+
+@router.get("/deletion-requests")
+async def list_deletion_requests(
+    admin_user: User = Depends(require_admin),
+    db: Session = Depends(get_pii_db)
+):
+    requests = db.query(DeletionRequest).order_by(DeletionRequest.created_at.desc()).all()
+    return {
+        "requests": [
+            {
+                "id": r.id,
+                "user_id": r.user_id,
+                "user_email": r.user.email,
+                "reason": r.reason,
+                "status": r.status.value,
+                "created_at": r.created_at.isoformat() + "Z"
+            }
+            for r in requests
+        ]
+    }
+
+class DeletionRequestUpdate(BaseModel):
+    status: str
+
+@router.put("/deletion-requests/{request_id}")
+async def update_deletion_request(
+    request_id: int,
+    update_data: DeletionRequestUpdate,
+    admin_user: User = Depends(require_admin),
+    db: Session = Depends(get_pii_db)
+):
+    try:
+        new_status = DeletionRequestStatus(update_data.status)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid status")
+        
+    req = db.query(DeletionRequest).filter(DeletionRequest.id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Request not found")
+        
+    req.status = new_status
+    db.commit()
+    return {"success": True, "message": f"Request status updated to {new_status.value}"}

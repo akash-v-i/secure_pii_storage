@@ -6,8 +6,7 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import { jwtDecode } from 'jwt-decode';
 
 // API base URL - adjust if your backend runs on a different port
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8080';
-
+const API_BASE_URL = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://127.0.0.1:8080');
 
 // Log the API URL in development to help debugging hosting issues
 if (import.meta.env.DEV) {
@@ -219,6 +218,36 @@ export const vaultAPI = {
     const response = await api.get('/api/vault/stats');
     return response.data;
   },
+
+  downloadBackup: async () => {
+    const response = await api.get('/api/vault/backup/download', {
+      responseType: 'blob'
+    });
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'backup.zip');
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
+  submitDeletionRequest: async (reason: string) => {
+    const response = await api.post('/api/vault/deletion-request', { reason });
+    return response.data;
+  },
+
+  getDeletionRequest: async () => {
+    const response = await api.get('/api/vault/deletion-request');
+    return response.data;
+  },
+
+  confirmDeletionRequest: async () => {
+    const response = await api.post('/api/vault/deletion-request/confirm');
+    return response.data;
+  },
 };
 
 // Admin API (optional)
@@ -254,6 +283,16 @@ export const adminAPI = {
 
   getStatistics: async () => {
     const response = await api.get('/api/admin/statistics');
+    return response.data;
+  },
+
+  getDeletionRequests: async () => {
+    const response = await api.get('/api/admin/deletion-requests');
+    return response.data.requests || [];
+  },
+
+  updateDeletionRequest: async (requestId: number, status: string) => {
+    const response = await api.put(`/api/admin/deletion-requests/${requestId}`, { status });
     return response.data;
   },
 };

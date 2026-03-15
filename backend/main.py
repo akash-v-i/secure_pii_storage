@@ -73,16 +73,6 @@ app.include_router(vault.router, prefix="/api/vault", tags=["Vault"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 
 
-@app.get("/")
-async def root():
-    """Health check endpoint"""
-    return {
-        "status": "ok",
-        "message": "SECURE-VAULT API is running",
-        "version": "1.0.0"
-    }
-
-
 @app.get("/health")
 async def health_check():
     """Detailed health check"""
@@ -90,6 +80,51 @@ async def health_check():
         "status": "healthy",
         "service": "SECURE-VAULT API"
     }
+
+# --- Frontend Hosting Configuration ---
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from fastapi import HTTPException
+
+dist_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dist")
+
+if os.path.exists(dist_path) and os.path.isdir(dist_path):
+    print("DIAGNOSTIC: Running in combined hosting mode (serving frontend from dist)")
+    
+    # Serve assets folder
+    assets_path = os.path.join(dist_path, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+        
+    # Other public files (vite.svg, etc) could also be mounted here,
+    # but our catch-all route handles them just fine.
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # Ignore API paths
+        if full_path.startswith("api/") or full_path.startswith("auth/"):
+            raise HTTPException(status_code=404, detail="API route not found")
+            
+        file_path = os.path.join(dist_path, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        
+        # Fallback to index.html for React Router
+        index_path = os.path.join(dist_path, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        raise HTTPException(status_code=404, detail="File not found in dist")
+else:
+    print("DIAGNOSTIC: Running in API-only mode (no dist folder found)")
+    @app.get("/")
+    async def root():
+        """Health check endpoint"""
+        return {
+            "status": "ok",
+            "message": "SECURE-VAULT API is running",
+            "version": "1.0.0"
+        }
+
 
 
 if __name__ == "__main__":

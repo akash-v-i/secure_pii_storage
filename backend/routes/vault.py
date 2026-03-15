@@ -8,7 +8,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 
 from db.session import get_pii_db, get_keys_db
-from db.pii_db import PIIRecord, User, PIIFile, LoginAttempt, AuditLog
+from db.pii_db import PIIRecord, User, PIIFile, LoginAttempt, AuditLog, DeletionRequest, DeletionRequestStatus
 from db.key_db import FieldKey
 from services.crypto_service import crypto_service
 from routes.auth import get_current_user
@@ -16,6 +16,9 @@ from utils.logger import setup_logger
 from fastapi import UploadFile, File
 from fastapi.responses import StreamingResponse
 from io import BytesIO
+import io
+import zipfile
+import json
 
 router = APIRouter()
 logger = setup_logger()
@@ -691,6 +694,23 @@ async def get_alerts(
                 "isRead": False,
                 "severity": "critical" if len(failed_logins) > 3 else "warning"
             })
+
+        # 3. Check for approved deletion request
+        approved_request = pii_db.query(DeletionRequest).filter(
+            DeletionRequest.user_id == current_user.id,
+            DeletionRequest.status == DeletionRequestStatus.APPROVED
+        ).first()
+
+        if approved_request:
+            alerts.append({
+                "id": f"delreq-{approved_request.id}",
+                "type": "expiry",
+                "title": "Deletion Request Approved",
+                "description": "Your data deletion request has been approved. Please go to Privacy settings to confirm full deletion.",
+                "timestamp": approved_request.updated_at.isoformat() + "Z",
+                "isRead": False,
+                "severity": "critical"
+            })
             
         return {"alerts": alerts}
         
@@ -738,3 +758,125 @@ async def get_stats(
     except Exception as e:
         logger.error(f"Get stats error: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get stats")
+
+class DeletionReasonRequest(BaseModel):
+    reason: str
+
+@router.post("/deletion-request")
+async def create_deletion_request(
+    request_data: DeletionReasonRequest,
+    current_user: User = Depends(get_current_user),
+    pii_db: Session = Depends(get_pii_db)
+):
+    # Check if a pending or approved request already exists
+    existing = pii_db.query(DeletionRequest).filter(
+        DeletionRequest.user_id == current_user.id,
+        DeletionRequest.status.in_([DeletionRequestStatus.PENDING, DeletionRequestStatus.APPROVED])
+    ).first()
+    if existing:
+        return {"success": False, "message": "You already have an active deletion request."}
+
+    # Check for 7-day cooldown if rejected
+    rejected = pii_db.query(DeletionRequest).filter(
+        DeletionRequest.user_id == current_user.id,
+        DeletionRequest.status == DeletionRequestStatus.REJECTED
+    ).order_by(DeletionRequest.updated_at.desc()).first()
+
+    if rejected:
+        cooldown_period = timedelta(days=7)
+        if datetime.utcnow() < rejected.updated_at + cooldown_period:
+            time_left = (rejected.updated_at + cooldown_period) - datetime.utcnow()
+            days = time_left.days
+            hours = time_left.seconds // 3600
+            
+            wait_msg = f"{days} days" if days > 0 else f"{hours} hours"
+            return {
+                "success": False, 
+                "message": f"Your previous request was rejected. You can request again in {wait_msg}."
+            }
+
+    new_request = DeletionRequest(
+        user_id=current_user.id,
+        reason=request_data.reason,
+        status=DeletionRequestStatus.PENDING
+    )
+    pii_db.add(new_request)
+    pii_db.commit()
+    return {"success": True, "message": "Deletion request submitted."}
+
+@router.get("/deletion-request")
+async def get_deletion_request(
+    current_user: User = Depends(get_current_user),
+    pii_db: Session = Depends(get_pii_db)
+):
+    req = pii_db.query(DeletionRequest).filter(
+        DeletionRequest.user_id == current_user.id
+    ).order_by(DeletionRequest.created_at.desc()).first()
+    if not req:
+        return {"exists": False}
+    return {
+        "exists": True,
+        "id": req.id,
+        "reason": req.reason,
+        "status": req.status.value,
+        "created_at": req.created_at.isoformat() + "Z"
+    }
+
+@router.post("/deletion-request/confirm")
+async def confirm_deletion_request(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    pii_db: Session = Depends(get_pii_db),
+    keys_db: Session = Depends(get_keys_db)
+):
+    req = pii_db.query(DeletionRequest).filter(
+        DeletionRequest.user_id == current_user.id,
+        DeletionRequest.status == DeletionRequestStatus.APPROVED
+    ).first()
+    
+    if not req:
+        raise HTTPException(status_code=400, detail="No approved deletion request found.")
+    
+    # Delete everything
+    pii_db.query(PIIRecord).filter(PIIRecord.user_id == current_user.id).delete()
+    pii_db.query(PIIFile).filter(PIIFile.user_id == current_user.id).delete()
+    
+    req.status = DeletionRequestStatus.COMPLETED
+    pii_db.commit()
+    
+    log_audit_event(
+        pii_db,
+        current_user,
+        "FULL_DELETION",
+        "User confirmed and executed full data deletion.",
+        request
+    )
+    return {"success": True, "message": "All data has been permanently deleted."}
+
+@router.get("/backup/download")
+async def download_backup(
+    current_user: User = Depends(get_current_user),
+    pii_db: Session = Depends(get_pii_db)
+):
+    # Fetch all records
+    records = pii_db.query(PIIRecord).filter(PIIRecord.user_id == current_user.id).all()
+    # Format them into json
+    data = []
+    for r in records:
+        data.append({
+            "category": r.category,
+            "pii_type": r.pii_type,
+            "type_label": r.type_label,
+            "encrypted_value": r.encrypted_value,
+            "label": r.label,
+            "notes": r.notes
+        })
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+        zip_file.writestr("backup.json", json.dumps(data, indent=2))
+    
+    return StreamingResponse(
+        iter([zip_buffer.getvalue()]),
+        media_type="application/x-zip-compressed",
+        headers={"Content-Disposition": f'attachment; filename="backup_{current_user.id}.zip"'}
+    )
