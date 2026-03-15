@@ -75,7 +75,7 @@ export const SecurityDemoModal: React.FC = () => {
     const [isPlaying, setIsPlaying] = useState(false);
 
     useEffect(() => {
-        let interval: any;
+        let interval: NodeJS.Timeout | undefined;
         if (isPlaying) {
             interval = setInterval(() => {
                 setActiveStep((prev) => (prev + 1) % steps.length);
@@ -207,7 +207,13 @@ export const SecurityDemoModal: React.FC = () => {
     );
 };
 
-const Badge = ({ children, variant, className }: any) => (
+interface BadgeProps {
+  children: React.ReactNode;
+  variant?: string;
+  className?: string;
+}
+
+const Badge = ({ children, variant, className }: BadgeProps) => (
     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${className}`}>
         {children}
     </span>

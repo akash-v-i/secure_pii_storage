@@ -65,7 +65,7 @@ export const LoginHistory: React.FC = () => {
     const fetchHistory = async () => {
       try {
         const data = await authAPI.getLoginHistory();
-        setHistory(data.map((entry: any) => ({
+        setHistory(data.map((entry: LoginEntry) => ({
           id: entry.id,
           timestamp: new Date(entry.timestamp).toLocaleString('en-IN', {
             day: '2-digit',

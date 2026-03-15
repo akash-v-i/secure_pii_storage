@@ -27,6 +27,14 @@ interface SecureFile {
   encrypted: boolean;
 }
 
+interface FileObj {
+  id: number;
+  name: string;
+  type: string;
+  size: number;
+  uploadedAt: string;
+}
+
 
 const getFileIcon = (type: string) => {
   if (type.startsWith('image/')) return Image;
@@ -51,7 +59,7 @@ export const SecureFiles: React.FC = () => {
       setLoading(true);
       const data = await vaultAPI.listFiles();
       // Format the data to match SecureFile interface
-      const formattedFiles = data.map((f: any) => ({
+      const formattedFiles = data.map((f: FileObj) => ({
         id: String(f.id),
         name: f.name,
         type: f.type,

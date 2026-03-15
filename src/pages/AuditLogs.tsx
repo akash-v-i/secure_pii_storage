@@ -67,7 +67,7 @@ export const AuditLogs: React.FC = () => {
       try {
         const data = await adminAPI.getAuditLogs();
         // Map backend data to frontend log format
-        setLogs(data.map((log: any) => ({
+        setLogs(data.map((log: any): AuditLogEntry => ({
           id: log.id.toString(),
           eventType: log.event_type || (log.success ? 'LOGIN_SUCCESS' : 'LOGIN_FAILED'),
           user: log.email,

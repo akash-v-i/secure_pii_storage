@@ -17,11 +17,26 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  role: string;
+  pii_count?: number;
+}
+
+interface PiiRecord {
+  id: number;
+  field_type: string;
+  masked_value: string;
+  created_at: string;
+}
+
 export const UserGrader: React.FC = () => {
-    const [users, setUsers] = useState<any[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedUser, setSelectedUser] = useState<any | null>(null);
-    const [graphRecords, setGraphRecords] = useState<any[]>([]);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [graphRecords, setGraphRecords] = useState<PiiRecord[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isGraphLoading, setIsGraphLoading] = useState(false);
 
@@ -34,7 +49,7 @@ export const UserGrader: React.FC = () => {
         try {
             const data = await adminAPI.listUsers();
             // Filter out admins
-            const normalUsers = data.filter((u: any) => u.role !== 'admin');
+            const normalUsers = data.filter((u: User) => u.role !== 'admin');
             setUsers(normalUsers);
         } catch (error) {
             console.error("Failed to load users", error);
@@ -44,7 +59,7 @@ export const UserGrader: React.FC = () => {
         }
     };
 
-    const handleSelectUser = async (user: any) => {
+    const handleSelectUser = async (user: User) => {
         setSelectedUser(user);
         setIsGraphLoading(true);
         setGraphRecords([]);

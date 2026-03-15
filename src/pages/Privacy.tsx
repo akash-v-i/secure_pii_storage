@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 export const Privacy: React.FC = () => {
   const { hasRole, isLoading: authLoading } = useAuth();
 
-  const [stats, setStats] = useState<any>({
+  const [stats, setStats] = useState<PrivacyStats>({
     piiCount: 0,
     fileCount: 0,
     totalFileSize: 0,
@@ -24,7 +24,21 @@ export const Privacy: React.FC = () => {
     defaultRetention: '365 days'
   });
 
-  const [deletionRequest, setDeletionRequest] = useState<any>(null);
+  const [deletionRequest, setDeletionRequest] = useState<DeletionReq | null>(null);
+
+interface PrivacyStats {
+  piiCount: number;
+  fileCount: number;
+  totalFileSize: number;
+  expiringCount: number;
+  auditCount: number;
+  defaultRetention: string;
+}
+
+interface DeletionReq {
+  exists: boolean;
+  [key: string]: any;
+}
   const [isDeletionModalOpen, setIsDeletionModalOpen] = useState(false);
   const [deletionReason, setDeletionReason] = useState("");
 

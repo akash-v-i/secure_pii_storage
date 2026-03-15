@@ -25,10 +25,28 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
+interface DeletionRequest {
+  id: number;
+  user_id: number;
+  reason: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 const DeletionRequests: React.FC = () => {
     const { hasRole, isLoading: authLoading } = useAuth();
-    const [deletionRequests, setDeletionRequests] = useState<any[]>([]);
+    const [deletionRequests, setDeletionRequests] = useState<DeletionRequest[]>([]);
     const [selectedReason, setSelectedReason] = useState<string | null>(null);
+
+interface DeletionRequest {
+  id: number;
+  user_id: number;
+  reason: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
     const [isReasonDialogOpen, setIsReasonDialogOpen] = useState(false);
 
     useEffect(() => {

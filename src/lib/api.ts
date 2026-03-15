@@ -5,13 +5,11 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { jwtDecode } from 'jwt-decode';
 
-// API base URL - adjust if your backend runs on a different port
-const API_BASE_URL = 'https://journals-car-mainstream-xbox.trycloudflare.com';
+// API base URL - Using the new tunnel and environment variable fallback
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://performer-bras-richmond-montana.trycloudflare.com';
 
-// Log the API URL in development to help debugging hosting issues
-if (import.meta.env.DEV) {
-  console.log('API Base URL:', API_BASE_URL);
-}
+// Log the API URL to help debugging hosting issues
+console.log('API Base URL:', API_BASE_URL);
 
 
 interface DecodedToken {

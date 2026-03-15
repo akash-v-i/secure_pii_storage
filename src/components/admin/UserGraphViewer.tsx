@@ -5,8 +5,26 @@ import {
     TooltipProvider,
 } from "@/components/ui/tooltip";
 
+interface Record {
+  id: number;
+  field_type: string;
+  masked_value: string;
+  created_at: string;
+}
+
+interface GraphNode {
+  id: string | number;
+  x: number;
+  y: number;
+  color: string;
+  isHighRisk: boolean;
+  sizeMultiplier: number;
+  icon: React.ElementType;
+  isHighExposure: boolean;
+}
+
 interface UserGraphViewerProps {
-    records: any[];
+    records: Record[];
     username: string;
 }
 
@@ -104,7 +122,7 @@ export const UserGraphViewer: React.FC<UserGraphViewerProps> = ({ records, usern
                     ) : (
                         <div className="relative w-full h-full flex items-center justify-center">
                             <svg viewBox="0 0 800 600" className="w-full h-full max-h-full drop-shadow-2xl">
-                                {graphData.nodes.map((node: any) => (
+                                {graphData.nodes.map((node: GraphNode) => (
                                     <g key={`link-${node.id}`}>
                                         <path
                                             d={`M 400 300 L ${node.x} ${node.y}`}
@@ -137,7 +155,7 @@ export const UserGraphViewer: React.FC<UserGraphViewerProps> = ({ records, usern
                                     </foreignObject>
                                 </g>
 
-                                {graphData.nodes.map((node: any) => (
+                                {graphData.nodes.map((node: GraphNode) => (
                                     <g
                                         key={node.id}
                                         transform={`translate(${node.x}, ${node.y}) scale(${node.sizeMultiplier})`}
