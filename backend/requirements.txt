@@ -12,3 +12,4 @@ bleach==6.1.0
 email-validator==2.1.0.post1
 pydantic==2.5.3
 pydantic-settings==2.1.0
+python-multipart==0.0.9

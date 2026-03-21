@@ -5,8 +5,18 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { jwtDecode } from 'jwt-decode';
 
-// API base URL - Using the new tunnel and environment variable fallback
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://performer-bras-richmond-montana.trycloudflare.com';
+// API base URL - MUST be set via VITE_API_URL environment variable
+// In development: set in .env.local → VITE_API_URL=http://127.0.0.1:8080
+// In production:  set in Vercel Dashboard → VITE_API_URL=https://your-backend.railway.app
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
+if (!API_BASE_URL) {
+  console.error(
+    '[PIIVault] CRITICAL: VITE_API_URL is not set.\n' +
+    'For local dev: add VITE_API_URL=http://127.0.0.1:8080 to .env.local\n' +
+    'For production: add VITE_API_URL in the Vercel Dashboard Environment Variables.'
+  );
+}
 
 // Log the API URL to help debugging hosting issues
 console.log('API Base URL:', API_BASE_URL);

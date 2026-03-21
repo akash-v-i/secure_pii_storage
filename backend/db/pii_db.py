@@ -3,7 +3,6 @@ PII Database Models
 Contains all models for the pii_db database
 """
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, Enum as SQLEnum
-from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -88,8 +87,8 @@ class PIIFile(PIIDeclarativeBase):
     size = Column(Integer, nullable=False)  # Size in bytes
     
     # Encrypted data (stored as hex string, similar to PII record)
-    # Use LONGTEXT for large files (Text is limited to 64KB)
-    encrypted_data = Column(LONGTEXT, nullable=False)  # Hex encoded encrypted binary
+    # Text is large enough for encrypted files; MySQL maps this to MEDIUMTEXT or LONGTEXT
+    encrypted_data = Column(Text, nullable=False)  # Hex encoded encrypted binary
     nonce = Column(String(255), nullable=False)
     key_id = Column(String(255), nullable=False)
     

@@ -34,9 +34,12 @@ __pycache__/
 .Python
 
 # Environment variables
-.env
+# Keep .env (base, has comments) and .env.production (placeholder URLs — no real secrets)
+# Ignore real-secret files
 .env.local
 .env.*.local
+# Ignore backend .env which has real credentials
+backend/.env
 
 # Database
 *.sqlite3
