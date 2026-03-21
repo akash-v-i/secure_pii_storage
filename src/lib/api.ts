@@ -33,10 +33,10 @@ const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
-    // Required to bypass ngrok's browser warning interstitial page.
-    // This header is ignored by non-ngrok servers, so it's safe to always include.
     'ngrok-skip-browser-warning': 'true',
+    'User-Agent': 'Custom-Client'
   },
+  withCredentials: false
 });
 
 // Request interceptor to add JWT token
@@ -109,7 +109,12 @@ export const authAPI = {
     return response.data;
   },
   getCaptcha: async () => {
-    const response = await api.get('/auth/captcha');
+    const response = await api.get('/auth/captcha', {
+      headers: {
+        'ngrok-skip-browser-warning': 'true',
+        'User-Agent': 'Custom-Client'
+      }
+    });
     return response.data;
   },
 
