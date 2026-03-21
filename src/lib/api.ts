@@ -33,6 +33,9 @@ const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    // Required to bypass ngrok's browser warning interstitial page.
+    // This header is ignored by non-ngrok servers, so it's safe to always include.
+    'ngrok-skip-browser-warning': 'true',
   },
 });
 
