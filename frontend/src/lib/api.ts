@@ -6,7 +6,7 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import { jwtDecode } from 'jwt-decode';
 
 // API base URL — override via VITE_API_URL (.env.local for dev, Vercel/Render for prod)
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 // Log the API URL to help debugging hosting issues
 console.log('API Base URL:', API_BASE_URL);
